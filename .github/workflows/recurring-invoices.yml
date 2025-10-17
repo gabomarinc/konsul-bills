@@ -1,0 +1,50 @@
+name: Generate Recurring Invoices
+
+# Ejecutar todos los días a las 2:00 AM UTC
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # Permite ejecución manual desde GitHub
+  workflow_dispatch:
+
+jobs:
+  generate-invoices:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Call Cron API
+        run: |
+          echo "Calling recurring invoices cron endpoint..."
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            ${{ secrets.APP_URL }}/api/cron/recurring-invoices \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ $http_code -ne 200 ]; then
+            echo "❌ Error: API returned $http_code"
+            echo "Response body: $body"
+            exit 1
+          fi
+          
+          echo "✅ Recurring invoices generated successfully"
+      
+      - name: Success Notification
+        if: success()
+        run: |
+          echo "✅ Job completed successfully"
+          echo "Timestamp: $(date)"
+      
+      - name: Failure Notification
+        if: failure()
+        run: |
+          echo "❌ Job failed"
+          echo "Timestamp: $(date)"
+          echo "Please check the logs above for details"
+

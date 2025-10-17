@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  User              User    @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerAccountId])
+}
+
+model Client {
+  id               String             @id
+  companyId        String
+  name             String
+  email            String?
+  phone            String?
+  taxId            String?
+  billingLine1     String?
+  billingLine2     String?
+  billingCity      String?
+  billingZip       String?
+  billingState     String?
+  billingCountry   String?
+  notes            String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  Company          Company            @relation(fields: [companyId], references: [id])
+  Invoice          Invoice[]
+  Quote            Quote[]
+  RecurringInvoice RecurringInvoice[]
+
+  @@unique([companyId, name])
+}
+
+model Company {
+  id               String             @id
+  name             String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  Client           Client[]
+  CompanySettings  CompanySettings?
+  Invoice          Invoice[]
+  Membership       Membership[]
+  Quote            Quote[]
+  Sequence         Sequence[]
+  RecurringInvoice RecurringInvoice[]
+}
+
+model CompanySettings {
+  id                    String  @id
+  companyId             String  @unique
+  logoUrl               String?
+  primaryColor          String?
+  accentColor           String?
+  legalName             String?
+  taxId                 String?
+  emailFrom             String?
+  phone                 String?
+  website               String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String?
+  zip                   String?
+  country               String?
+  defaultCurrency       String  @default("EUR")
+  defaultTaxRate        Float   @default(21)
+  locale                String  @default("es-ES")
+  timezone              String  @default("Europe/Madrid")
+  quotePrefix           String  @default("Q-")
+  invoicePrefix         String  @default("INV-")
+  numberPadding         Int     @default(5)
+  // Stripe Integration
+  stripeEnabled         Boolean @default(false)
+  stripeSecretKey       String? // Encrypted
+  stripePublishableKey  String?
+  Company               Company @relation(fields: [companyId], references: [id])
+}
+
+model Invoice {
+  id              String        @id
+  companyId       String
+  clientId        String
+  quoteId         String?
+  title           String
+  issueDate       DateTime
+  dueDate         DateTime?
+  currency        String        @default("EUR")
+  tax             Float         @default(21)
+  status          String        @default("DRAFT")
+  notes           String?
+  subtotal        Float         @default(0)
+  taxAmount       Float         @default(0)
+  total           Float         @default(0)
+  balanceDue      Float         @default(0)
+  pdfUrl          String?
+  createdById     String?
+  // Stripe Integration
+  stripeInvoiceId String?       @unique
+  stripePaymentId String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime
+  Quote           Quote?        @relation(fields: [quoteId], references: [id])
+  Client          Client        @relation(fields: [clientId], references: [id])
+  Company         Company       @relation(fields: [companyId], references: [id])
+  InvoiceItem     InvoiceItem[]
+  Payment         Payment[]
+
+  @@index([companyId, issueDate])
+}
+
+model InvoiceItem {
+  id          String  @id
+  invoiceId   String
+  description String
+  qty         Float
+  price       Float
+  Invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Membership {
+  id        String  @id
+  userId    String
+  companyId String
+  role      String  @default("OWNER")
+  Company   Company @relation(fields: [companyId], references: [id])
+  User      User    @relation(fields: [userId], references: [id])
+
+  @@unique([userId, companyId])
+}
+
+model Payment {
+  id        String   @id
+  invoiceId String
+  date      DateTime
+  amount    Float
+  method    String   @default("OTHER")
+  reference String?
+  notes     String?
+  createdAt DateTime @default(now())
+  Invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model Quote {
+  id          String      @id
+  companyId   String
+  clientId    String
+  title       String
+  issueDate   DateTime
+  dueDate     DateTime?
+  currency    String      @default("EUR")
+  tax         Float       @default(21)
+  status      String      @default("DRAFT")
+  notes       String?
+  subtotal    Float       @default(0)
+  taxAmount   Float       @default(0)
+  total       Float       @default(0)
+  pdfUrl      String?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  Invoice     Invoice[]
+  Client      Client      @relation(fields: [clientId], references: [id])
+  Company     Company     @relation(fields: [companyId], references: [id])
+  QuoteItem   QuoteItem[]
+
+  @@index([companyId, issueDate])
+}
+
+model QuoteItem {
+  id          String @id
+  quoteId     String
+  description String
+  qty         Float
+  price       Float
+  Quote       Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+}
+
+model Sequence {
+  id        String  @id
+  companyId String
+  type      String
+  current   Int     @default(0)
+  Company   Company @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, type])
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id          String       @id
+  email       String       @unique
+  name        String?
+  password    String?      // Campo para contraseñas hasheadas
+  image       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  Account     Account[]
+  Membership  Membership[]
+  Session     Session[]
+  UserProfile UserProfile?
+}
+
+model UserProfile {
+  id                     String    @id
+  userId                 String    @unique
+  role                   String
+  yearsExperience        Int
+  seniority              String
+  skills                 String
+  location               String?
+  availability           String?
+  contributionType       String?
+  certifications         String?
+  portfolioUrl           String?
+  billingMethod          String?
+  currentHourlyRate      Float?
+  targetHourlyRate       Float?
+  currentProjectRate     Float?
+  targetProjectRate      Float?
+  lastProjectDetails     String?
+  lastProjectRate        Float?
+  minProjectRate         Float?
+  marketAnalysis         String?
+  pricingRecommendations String?
+  lastAnalysisDate       DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime
+  User                   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RecurringInvoice {
+  id              String                 @id
+  companyId       String
+  clientId        String
+  title           String
+  description     String?
+  // Configuración de recurrencia
+  frequency       String                 // "MONTHLY", "WEEKLY", "YEARLY"
+  intervalValue   Int                    @default(1)
+  dayOfMonth      Int?                   // 1-31 (para mensual)
+  dayOfWeek       Int?                   // 0-6 (para semanal)
+  // Fechas
+  startDate       DateTime
+  endDate         DateTime?
+  nextRunDate     DateTime
+  lastRunDate     DateTime?
+  // Datos de la factura
+  currency        String                 @default("EUR")
+  tax             Float                  @default(21)
+  subtotal        Float                  @default(0)
+  taxAmount       Float                  @default(0)
+  total           Float                  @default(0)
+  dueInDays       Int                    @default(30)
+  notes           String?
+  // Estado
+  isActive        Boolean                @default(true)
+  // Relaciones
+  Company         Company                @relation(fields: [companyId], references: [id])
+  Client          Client                 @relation(fields: [clientId], references: [id])
+  RecurringItem   RecurringInvoiceItem[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime
+
+  @@index([companyId, nextRunDate])
+  @@index([companyId, isActive])
+}
+
+model RecurringInvoiceItem {
+  id                 String           @id
+  recurringInvoiceId String
+  description        String
+  qty                Float
+  price              Float
+  RecurringInvoice   RecurringInvoice @relation(fields: [recurringInvoiceId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

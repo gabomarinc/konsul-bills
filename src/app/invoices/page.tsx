@@ -16,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
-import { useInvoices, useInvalidateInvoices } from "@/hooks/useInvoices"
+import { useInvoices } from "@/hooks/useInvoices"
 import { 
   FileText, 
   CheckCircle, 
@@ -59,7 +59,6 @@ export default function InvoicesPage() {
   const router = useRouter()
   const { t } = useTranslation()
   const { data = [], isLoading } = useInvoices()
-  const invalidateInvoices = useInvalidateInvoices()
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<Invoice["status"] | "all">("all")
 

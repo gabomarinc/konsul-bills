@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/contexts/LanguageContext"
+import type { TranslationKeys } from "@/locales"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -41,7 +42,7 @@ type RecurringInvoice = {
 const fmt = (n: number, c: string = "EUR") =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: c }).format(n)
 
-const getFrequencyText = (frequency: string, interval: number, t: any) => {
+const getFrequencyText = (frequency: string, interval: number, t: TranslationKeys) => {
   if (frequency === "MONTHLY") {
     return interval === 1 ? t.recurringInvoices.frequencyMonthly : `${interval} ${t.recurringInvoices.intervalMonths}`
   }
@@ -60,10 +61,6 @@ export default function RecurringInvoicesPage() {
   const [data, setData] = useState<RecurringInvoice[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
   const fetchData = async () => {
     try {
       setLoading(true)
@@ -80,6 +77,11 @@ export default function RecurringInvoicesPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleToggleActive = async (id: string, currentState: boolean) => {
     try {
@@ -248,4 +250,5 @@ export default function RecurringInvoicesPage() {
     </div>
   )
 }
+
 

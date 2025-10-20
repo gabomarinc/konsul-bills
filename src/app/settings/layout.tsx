@@ -8,3 +8,4 @@ export default function SettingsLayout({
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>
 }
 
+

@@ -8,3 +8,4 @@ export default function QuotesLayout({
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>
 }
 
+

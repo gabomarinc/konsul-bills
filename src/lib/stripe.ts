@@ -36,7 +36,7 @@ export async function getStripeClient(companyId: string): Promise<Stripe | null>
 
     // Inicializar el cliente de Stripe
     const stripe = new Stripe(secretKey, {
-      apiVersion: "2024-12-18.acacia"
+      apiVersion: "2025-09-30.clover"
     })
 
     return stripe
@@ -59,4 +59,5 @@ export async function isStripeEnabled(companyId: string): Promise<boolean> {
 
   return !!(settings?.stripeEnabled && settings?.stripeSecretKey)
 }
+
 

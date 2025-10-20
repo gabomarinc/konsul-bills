@@ -82,7 +82,7 @@ export default function NewRecurringInvoicePage() {
     setItems(items.filter(item => item.id !== id))
   }
 
-  const updateItem = (id: string, field: keyof LineItem, value: any) => {
+  const updateItem = (id: string, field: keyof LineItem, value: string | number) => {
     setItems(items.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ))
@@ -123,7 +123,11 @@ export default function NewRecurringInvoicePage() {
         currency,
         tax,
         dueInDays,
-        items: items.map(({ id, ...rest }) => rest),
+        items: items.map((item) => ({
+          description: item.description,
+          qty: item.qty,
+          price: item.price
+        })),
         notes: notes || null,
       }
 
@@ -141,9 +145,10 @@ export default function NewRecurringInvoicePage() {
 
       toast.success(t.recurringInvoices.createSuccess)
       router.push("/invoices/recurring")
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating recurring invoice:", error)
-      toast.error(error.message || t.recurringInvoices.createError)
+      const errorMessage = error instanceof Error ? error.message : t.recurringInvoices.createError
+      toast.error(errorMessage)
     } finally {
       setIsSaving(false)
     }
@@ -299,7 +304,7 @@ export default function NewRecurringInvoicePage() {
         <Card className="p-6">
           <h3 className="text-lg font-semibold mb-4">💰 {t.invoices.items}</h3>
           <div className="space-y-3">
-            {items.map((item, idx) => (
+            {items.map((item) => (
               <div key={item.id} className="flex gap-2 items-start">
                 <div className="flex-1">
                   <Input
@@ -428,4 +433,5 @@ export default function NewRecurringInvoicePage() {
     </div>
   )
 }
+
 

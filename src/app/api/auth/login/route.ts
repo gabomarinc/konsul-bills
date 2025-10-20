@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const validation = loginSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Datos de entrada inválidos", details: validation.error.errors },
+        { error: "Datos de entrada inválidos", details: validation.error.issues },
         { status: 400 }
       )
     }
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
 
     // Buscar el usuario por email
     const user = await findUserByEmail(email)
-    if (!user) {
+    if (!user || !user.password) {
       return NextResponse.json(
         { error: "Credenciales inválidas" },
         { status: 401 }
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const token = await signToken({
       userId: user.id,
       email: user.email,
-      name: user.name
+      name: user.name || user.email
     })
 
     // Crear respuesta con cookie httpOnly

@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma"
 import { getUserCompanyFromRequest } from "@/lib/api-auth"
 import { nanoid } from "nanoid"
 
+type RecurringInvoiceItem = {
+  description: string
+  qty: number
+  price: number
+}
+
 /**
  * GET /api/recurring-invoices/[id]
  * Obtiene una factura recurrente específica
@@ -139,7 +145,7 @@ export async function PUT(
     } = body
 
     // Calcular subtotal, taxAmount y total
-    const subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.price), 0)
+    const subtotal = items.reduce((sum: number, item: RecurringInvoiceItem) => sum + (item.qty * item.price), 0)
     const taxAmount = (subtotal * tax) / 100
     const total = subtotal + taxAmount
 
@@ -174,7 +180,7 @@ export async function PUT(
     })
 
     await prisma.recurringInvoiceItem.createMany({
-      data: items.map((item: any) => ({
+      data: items.map((item: RecurringInvoiceItem) => ({
         id: `recitem_${nanoid(16)}`,
         recurringInvoiceId: id,
         description: item.description,

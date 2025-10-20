@@ -8,3 +8,4 @@ export default function InvoicesLayout({
   return <AuthenticatedLayout>{children}</AuthenticatedLayout>
 }
 
+

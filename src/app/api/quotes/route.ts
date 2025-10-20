@@ -11,6 +11,7 @@ type QuoteWithClient = {
   id: string
   title: string
   issueDate: Date
+  dueDate?: Date | null
   currency: string
   tax: number
   total: number

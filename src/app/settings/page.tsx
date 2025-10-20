@@ -617,7 +617,7 @@ export default function SettingsPage() {
                 <h4 className="text-sm font-semibold text-blue-900 mb-2">¿Cómo obtener tus API Keys?</h4>
                 <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
                   <li>Ve a tu Dashboard de Stripe</li>
-                  <li>Click en "Developers" → "API keys"</li>
+                  <li>Click en &quot;Developers&quot; → &quot;API keys&quot;</li>
                   <li>Copia tus keys (usa Test keys para pruebas)</li>
                   <li>Pégalas aquí y guarda</li>
                 </ol>

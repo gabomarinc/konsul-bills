@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const validation = registerSchema.safeParse(body)
     if (!validation.success) {
       return NextResponse.json(
-        { error: "Datos de entrada inválidos", details: validation.error.errors },
+        { error: "Datos de entrada inválidos", details: validation.error.issues },
         { status: 400 }
       )
     }

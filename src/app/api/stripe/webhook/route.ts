@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     // Verificar la firma del webhook usando una instancia temporal de Stripe
     // Nota: Esto requiere que tengamos una API key global o manejemos múltiples secrets
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-      apiVersion: "2024-12-18.acacia"
+      apiVersion: "2025-09-30.clover"
     })
 
     let event: Stripe.Event
@@ -96,12 +96,17 @@ async function handleInvoicePaymentSucceeded(stripeInvoice: Stripe.Invoice) {
     }
 
     // Actualizar el estado de la factura en nuestra BD
+    const invoiceAny = stripeInvoice as { payment_intent?: string | { id: string } | null }
+    const paymentIntentId = typeof invoiceAny.payment_intent === 'string' 
+      ? invoiceAny.payment_intent 
+      : invoiceAny.payment_intent?.id || null
+      
     const updatedInvoice = await prisma.invoice.update({
       where: { id: invoiceId },
       data: {
         status: "PAID",
         balanceDue: 0,
-        stripePaymentId: stripeInvoice.payment_intent as string | null
+        stripePaymentId: paymentIntentId
       }
     })
 
@@ -115,7 +120,7 @@ async function handleInvoicePaymentSucceeded(stripeInvoice: Stripe.Invoice) {
           amount: stripeInvoice.amount_paid / 100, // Convertir de centavos a unidad
           method: "STRIPE",
           reference: stripeInvoice.id,
-          notes: `Pago recibido vía Stripe - ${stripeInvoice.payment_intent || 'N/A'}`
+          notes: `Pago recibido vía Stripe - ${paymentIntentId || 'N/A'}`
         }
       })
     }
@@ -148,4 +153,5 @@ async function handleInvoicePaymentFailed(stripeInvoice: Stripe.Invoice) {
     console.error("Error handling payment failed:", error)
   }
 }
+
 

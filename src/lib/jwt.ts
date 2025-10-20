@@ -36,7 +36,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, getSecretKey(), {
       algorithms: ['HS256']
     })
-    return payload as JWTPayload
+    return payload as unknown as JWTPayload
   } catch (error) {
     console.error('JWT verification failed:', error instanceof Error ? error.message : 'Unknown error')
     return null

@@ -2,7 +2,6 @@
 
 import { useMemo } from "react"
 import { useTranslation } from "@/contexts/LanguageContext"
-import { useAuth } from "@/contexts/AuthContext"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,26 +13,12 @@ import {
   FileText, 
   TrendingUp, 
   Target,
-  BarChart3,
   FileDown,
   Sparkles,
   Receipt
 } from "lucide-react"
 
-type DbStatus = "draft" | "sent" | "accepted" | "rejected"
 type Currency = "EUR" | "USD"
-
-type ApiQuote = {
-  id: string
-  client: string
-  clientEmail?: string | null
-  title: string
-  issueDate: string
-  total: number
-  currency: Currency
-  status: DbStatus
-  createdAt: string
-}
 
 const fmtMoney = (n: number, c: Currency = "EUR") =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: c }).format(n)
@@ -70,7 +55,6 @@ const statusLabels = {
 
 export default function DashboardPage() {
   const { t } = useTranslation()
-  const { user } = useAuth()
   const { data = [], isLoading } = useQuotes()
 
   // Calcular métricas

@@ -82,7 +82,7 @@ export default function NewRecurringInvoicePage() {
     setItems(items.filter(item => item.id !== id))
   }
 
-  const updateItem = (id: string, field: keyof LineItem, value: string | number) => {
+  const updateItem = (id: string, field: keyof LineItem, value: string | number | undefined) => {
     setItems(items.map(item => 
       item.id === id ? { ...item, [field]: value } : item
     ))

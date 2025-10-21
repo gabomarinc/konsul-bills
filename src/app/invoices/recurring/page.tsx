@@ -42,7 +42,7 @@ type RecurringInvoice = {
 const fmt = (n: number, c: string = "EUR") =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: c }).format(n)
 
-const getFrequencyText = (frequency: string, interval: number, t: TranslationKeys) => {
+const getFrequencyText = (frequency: string, interval: number, t: TranslationKeys): string => {
   if (frequency === "MONTHLY") {
     return interval === 1 ? t.recurringInvoices.frequencyMonthly : `${interval} ${t.recurringInvoices.intervalMonths}`
   }

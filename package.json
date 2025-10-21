@@ -7,12 +7,12 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "npx prisma generate && next build",
+    "build": "node scripts/vercel-build.js",
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "postinstall": "npx prisma generate",
-    "vercel-build": "npx prisma generate && next build",
+    "vercel-build": "node scripts/vercel-build.js",
     "prebuild": "npx prisma generate"
   },
   "dependencies": {

@@ -7,12 +7,12 @@
   },
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "prisma generate && next build",
+    "build": "npx prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && next build"
+    "postinstall": "npx prisma generate",
+    "vercel-build": "npx prisma generate && next build"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.10.0",

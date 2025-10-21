@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node prisma/vercel-build.js",
+  "buildCommand": "./vercel-build.sh",
   "installCommand": "npm install",
   "framework": "nextjs",
   "functions": {

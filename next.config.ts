@@ -10,6 +10,15 @@ const nextConfig: NextConfig = {
     // Mantener verificación de TypeScript activa
     ignoreBuildErrors: false,
   },
+  // Configuración para Vercel
+  serverExternalPackages: ['@prisma/client'],
+  // Asegurar que Prisma se genere en cada build
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push('@prisma/client');
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

@@ -45,105 +45,9 @@ Sistema de gestión de facturación y cotizaciones construido con Next.js 15, Ty
 - Rate limiting configurable
 - Middleware de autenticación
 
-## 🚀 Instalación
 
-### Requisitos
-- Node.js 20+
-- npm o pnpm
 
-### Pasos
 
-1. **Clonar el repositorio**
-```bash
-git clone <tu-repositorio>
-cd konsul-bills
-```
-
-2. **Instalar dependencias**
-```bash
-npm install
-```
-
-3. **Configurar variables de entorno**
-```bash
-cp .env.example .env
-```
-
-Edita el archivo `.env` y configura las siguientes variables:
-
-```env
-# Base de datos
-DATABASE_URL="file:./prisma/dev.db"
-
-# JWT Secret - CAMBIA ESTO EN PRODUCCIÓN
-JWT_SECRET="tu-super-secreto-jwt-cambiar-en-produccion"
-
-# Configuración de sesión (en segundos)
-SESSION_MAX_AGE=86400 # 24 horas
-
-# Entorno
-NODE_ENV="development"
-
-# Rate Limiting
-RATE_LIMIT_MAX=10
-
-# Stripe (opcional - solo para webhooks)
-STRIPE_SECRET_KEY="sk_test_..."  # Solo si usas webhooks globales
-STRIPE_WEBHOOK_SECRET="whsec_..."  # Secret del webhook de Stripe
-ENCRYPTION_KEY="change-this-to-32-character-key!"  # 32 caracteres para encriptar API keys
-RATE_LIMIT_WINDOW_MS=900000 # 15 minutos
-```
-
-4. **Configurar base de datos**
-```bash
-npx prisma generate
-npx prisma db push
-```
-
-5. **Iniciar servidor de desarrollo**
-```bash
-npm run dev
-```
-
-La aplicación estará disponible en [http://localhost:3000](http://localhost:3000)
-
-## 📁 Estructura del Proyecto
-
-```
-konsul-bills/
-├── prisma/
-│   ├── schema.prisma       # Esquema de base de datos
-│   └── dev.db             # Base de datos SQLite
-├── src/
-│   ├── app/               # App Router de Next.js
-│   │   ├── api/          # API Routes
-│   │   │   ├── auth/     # Autenticación (login, register, logout)
-│   │   │   ├── invoices/ # CRUD de facturas
-│   │   │   └── quotes/   # CRUD de cotizaciones
-│   │   ├── auth/         # Páginas de autenticación
-│   │   ├── dashboard/    # Dashboard principal
-│   │   ├── invoices/     # Gestión de facturas
-│   │   ├── quotes/       # Gestión de cotizaciones
-│   │   └── settings/     # Configuración
-│   ├── components/       # Componentes React
-│   │   ├── konsul/      # Componentes específicos
-│   │   └── ui/          # Componentes UI reutilizables
-│   ├── contexts/        # Contextos de React
-│   │   └── AuthContext.tsx
-│   ├── lib/             # Utilidades
-│   │   ├── auth-utils.ts    # Utilidades de autenticación
-│   │   ├── db.ts            # Operaciones de base de datos
-│   │   ├── jwt.ts           # Manejo de JWT
-│   │   ├── rate-limit.ts    # Rate limiting
-│   │   ├── schemas.ts       # Esquemas de validación Zod
-│   │   ├── prisma.ts        # Cliente de Prisma
-│   │   └── ids.ts           # Generación de IDs
-│   └── middleware.ts    # Middleware de Next.js
-├── .env                 # Variables de entorno
-├── .env.example        # Ejemplo de variables de entorno
-└── package.json
-
-```
 
 ## 🔒 Seguridad
 
@@ -163,28 +67,7 @@ konsul-bills/
 
 ## 📊 API Endpoints
 
-### Autenticación
 
-#### POST `/api/auth/register`
-Registrar nuevo usuario
-
-```json
-{
-  "email": "usuario@ejemplo.com",
-  "password": "contraseña123",
-  "name": "Nombre Usuario"
-}
-```
-
-#### POST `/api/auth/login`
-Iniciar sesión
-
-```json
-{
-  "email": "usuario@ejemplo.com",
-  "password": "contraseña123"
-}
-```
 
 #### POST `/api/auth/logout`
 Cerrar sesión
@@ -383,16 +266,6 @@ npm run db:seed      # Poblar base de datos con datos de ejemplo
    - Migra a PostgreSQL o MySQL para producción
    - Configura backups automáticos
    - Implementa migrations con Prisma
-
-## 🤝 Contribuir
-
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/amazing-feature`)
-3. Commit tus cambios (`git commit -m 'Add amazing feature'`)
-4. Push a la rama (`git push origin feature/amazing-feature`)
-5. Abre un Pull Request
 
 ## 📄 Licencia
 

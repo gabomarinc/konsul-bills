@@ -26,7 +26,6 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@tailwindcss/postcss": "^4",
     "@tanstack/react-query": "^5.90.5",
     "autoprefixer": "^10.4.20",
     "bcryptjs": "^3.0.2",
@@ -45,7 +44,7 @@
     "sqlite3": "^5.1.7",
     "stripe": "^19.1.0",
     "tailwind-merge": "^3.3.1",
-    "tailwindcss": "^4",
+    "tailwindcss": "^3.4.0",
     "tw-animate-css": "^1.3.7",
     "zod": "^4.1.12"
   },

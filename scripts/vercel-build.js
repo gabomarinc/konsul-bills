@@ -39,3 +39,5 @@ try {
   console.error('❌ Error durante el build:', error.message);
   process.exit(1);
 }
+
+

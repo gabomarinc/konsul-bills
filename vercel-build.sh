@@ -29,3 +29,5 @@ echo "🚀 Iniciando build de Next.js..."
 npm run build
 
 echo "✅ Build completado exitosamente"
+
+

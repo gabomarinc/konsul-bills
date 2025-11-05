@@ -34,9 +34,11 @@ function getBot(): TelegramBot | null {
     const TelegramBotClass = require('node-telegram-bot-api')
     // Intentar con default primero, luego sin default
     const BotConstructor = TelegramBotClass.default || TelegramBotClass
-    return new BotConstructor(TELEGRAM_BOT_TOKEN) as TelegramBot
+    const bot = new BotConstructor(TELEGRAM_BOT_TOKEN, { polling: false }) as TelegramBot
+    console.log('[TELEGRAM] Bot inicializado correctamente')
+    return bot
   } catch (error) {
-    console.error('Error inicializando Telegram bot:', error)
+    console.error('[TELEGRAM] Error inicializando bot:', error)
     return null
   }
 }
@@ -68,6 +70,8 @@ export async function POST(req: NextRequest) {
     processTelegramUpdate(update).catch((error) => {
       console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
       console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
+    }).then(() => {
+      console.log('[TELEGRAM WEBHOOK] Procesamiento completado')
     })
 
     // Responder inmediatamente a Telegram (requerido)

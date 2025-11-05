@@ -106,14 +106,25 @@ async function processTelegramUpdate(update: any) {
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
     let telegramUser = await getTelegramUser(telegramId)
     console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
-
+    
     if (!telegramUser) {
+      console.log('[TELEGRAM] Usuario no encontrado. TelegramId:', telegramId)
+      console.log('[TELEGRAM] Intentando buscar en la base de datos...')
+      
+      // Intentar buscar directamente en la base de datos para debug
+      const { prisma } = await import('@/lib/prisma')
+      const allTelegramUsers = await prisma.telegramUser.findMany({
+        take: 5
+      })
+      console.log('[TELEGRAM] Usuarios en DB:', allTelegramUsers.map(u => ({ id: u.id, telegramId: u.telegramId, userId: u.userId })))
+      
       // Usuario no vinculado - requerir vinculación
       await bot.sendMessage(
         chatId,
         '⚠️ No estás vinculado a una cuenta.\n\n' +
         'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
-        'Visita tu panel de configuración en la aplicación web.'
+        'Visita tu panel de configuración en la aplicación web.\n\n' +
+        `Tu Telegram ID es: ${telegramId}`
       )
       return
     }

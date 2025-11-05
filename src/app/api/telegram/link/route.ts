@@ -47,8 +47,16 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Error vinculando usuario de Telegram:', error)
+    // Log más detallado para debugging
+    if (error instanceof Error) {
+      console.error('Error message:', error.message)
+      console.error('Error stack:', error.stack)
+    }
     return NextResponse.json(
-      { error: 'Error al vincular usuario de Telegram' },
+      { 
+        error: 'Error al vincular usuario de Telegram',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
       { status: 500 }
     )
   }

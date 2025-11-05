@@ -91,24 +91,61 @@ export async function linkTelegramUser(
   firstName?: string,
   lastName?: string
 ) {
-  return await prisma.telegramUser.upsert({
-    where: { telegramId },
-    update: {
-      username,
-      firstName,
-      lastName,
-      updatedAt: new Date()
-    },
-    create: {
-      id: generateId('telegram'),
-      telegramId,
-      userId,
-      username,
-      firstName,
-      lastName,
-      updatedAt: new Date()
+  try {
+    // Primero verificar si ya existe un usuario con este telegramId
+    const existingByTelegramId = await prisma.telegramUser.findUnique({
+      where: { telegramId }
+    })
+
+    // Verificar si ya existe un usuario con este userId
+    const existingByUserId = await prisma.telegramUser.findUnique({
+      where: { userId }
+    })
+
+    // Si existe por userId pero no por telegramId, actualizar
+    if (existingByUserId && !existingByTelegramId) {
+      return await prisma.telegramUser.update({
+        where: { userId },
+        data: {
+          telegramId,
+          username,
+          firstName,
+          lastName,
+          updatedAt: new Date()
+        }
+      })
     }
-  })
+
+    // Si existe por telegramId, actualizar
+    if (existingByTelegramId) {
+      return await prisma.telegramUser.update({
+        where: { telegramId },
+        data: {
+          userId,
+          username,
+          firstName,
+          lastName,
+          updatedAt: new Date()
+        }
+      })
+    }
+
+    // Si no existe, crear nuevo
+    return await prisma.telegramUser.create({
+      data: {
+        id: generateId('telegram'),
+        telegramId,
+        userId,
+        username,
+        firstName,
+        lastName,
+        updatedAt: new Date()
+      }
+    })
+  } catch (error) {
+    console.error('Error en linkTelegramUser:', error)
+    throw error
+  }
 }
 
 /**

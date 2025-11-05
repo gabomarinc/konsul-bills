@@ -123,13 +123,20 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] Usuarios en DB:', allTelegramUsers.map(u => ({ id: u.id, telegramId: u.telegramId, userId: u.userId })))
       
       // Usuario no vinculado - requerir vinculación
-      await bot.sendMessage(
-        chatId,
-        '⚠️ No estás vinculado a una cuenta.\n\n' +
-        'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
-        'Visita tu panel de configuración en la aplicación web.\n\n' +
-        `Tu Telegram ID es: ${telegramId}`
-      )
+      console.log('[TELEGRAM] Intentando enviar mensaje de usuario no vinculado a chatId:', chatId)
+      try {
+        const messageResult = await bot.sendMessage(
+          chatId,
+          '⚠️ No estás vinculado a una cuenta.\n\n' +
+          'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
+          'Visita tu panel de configuración en la aplicación web.\n\n' +
+          `Tu Telegram ID es: ${telegramId}`
+        )
+        console.log('[TELEGRAM] Mensaje enviado exitosamente:', messageResult)
+      } catch (sendError) {
+        console.error('[TELEGRAM] Error enviando mensaje:', sendError)
+        console.error('[TELEGRAM] Error details:', sendError instanceof Error ? sendError.message : 'Unknown error')
+      }
       return
     }
 

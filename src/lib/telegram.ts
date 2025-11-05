@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { generateId } from './db'
 import { getUserCompany } from './company-utils'
 import { nextHumanId } from './ids'
+// No importar TelegramBot aquí para evitar problemas en build
 
 // Tipos para estados de conversación
 export type ConversationState = 

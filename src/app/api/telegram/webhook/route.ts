@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import TelegramBot from 'node-telegram-bot-api'
+import type TelegramBot from 'node-telegram-bot-api'
 import {
   getTelegramUser,
   linkTelegramUser,
@@ -17,14 +17,20 @@ import { getUserCompany } from '@/lib/company-utils'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
-if (!TELEGRAM_BOT_TOKEN) {
-  console.warn('TELEGRAM_BOT_TOKEN no está configurado')
-}
+// Función para obtener el bot (solo se inicializa cuando se necesita)
+function getBot(): TelegramBot | null {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return null
+  }
 
-// Inicializar bot solo si hay token
-let bot: TelegramBot | null = null
-if (TELEGRAM_BOT_TOKEN) {
-  bot = new TelegramBot(TELEGRAM_BOT_TOKEN)
+  // Inicializar dinámicamente para evitar problemas en build
+  try {
+    const TelegramBotClass = require('node-telegram-bot-api')
+    return new TelegramBotClass(TELEGRAM_BOT_TOKEN)
+  } catch (error) {
+    console.error('Error inicializando Telegram bot:', error)
+    return null
+  }
 }
 
 /**
@@ -33,6 +39,7 @@ if (TELEGRAM_BOT_TOKEN) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const bot = getBot()
     if (!bot) {
       return NextResponse.json(
         { error: 'Telegram bot no configurado' },
@@ -60,6 +67,7 @@ export async function POST(req: NextRequest) {
  * Procesa una actualización de Telegram
  */
 async function processTelegramUpdate(update: any) {
+  const bot = getBot()
   if (!bot || !update.message) return
 
   const message = update.message
@@ -125,6 +133,7 @@ async function handleCommand(
   conversation: any,
   companyId: string
 ) {
+  const bot = getBot()
   if (!bot) return
 
   const cmd = command.split(' ')[0].toLowerCase()
@@ -213,6 +222,7 @@ async function handleConversation(
   conversation: any,
   companyId: string
 ) {
+  const bot = getBot()
   if (!bot) return
 
   const state = conversation.state

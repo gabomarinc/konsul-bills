@@ -11,11 +11,18 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   // Configuración para Vercel
-  serverExternalPackages: ['@prisma/client'],
+  serverExternalPackages: ['@prisma/client', 'node-telegram-bot-api'],
   // Asegurar que Prisma se genere en cada build
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.externals.push('@prisma/client');
+      // Evitar problemas con node-telegram-bot-api en build
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
     }
     return config;
   },

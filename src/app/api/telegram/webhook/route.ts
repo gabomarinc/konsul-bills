@@ -101,20 +101,22 @@ export async function POST(req: NextRequest) {
  */
 async function processTelegramUpdate(update: any) {
   const bot = getBot()
-  if (!bot || !update.message) {
-    console.log('[TELEGRAM] No bot o sin mensaje')
+  
+  // Manejar tanto message como edited_message
+  const message = update.message || update.edited_message
+  if (!bot || !message) {
+    console.log('[TELEGRAM] No bot o sin mensaje. Update:', JSON.stringify(update))
     return
   }
 
-  const message = update.message
   const chatId = message.chat.id
   const telegramId = String(message.from?.id)
-  const text = message.text || ''
+  const text = message.text || message.caption || ''
   const username = message.from?.username
   const firstName = message.from?.first_name
   const lastName = message.from?.last_name
 
-  console.log('[TELEGRAM] Procesando mensaje:', { chatId, telegramId, text })
+  console.log('[TELEGRAM] Procesando mensaje:', { chatId, telegramId, text, updateId: update.update_id })
 
   try {
     // Obtener o vincular usuario de Telegram

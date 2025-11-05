@@ -62,9 +62,21 @@ export function clearConversationState(telegramId: number) {
  */
 export async function getTelegramUser(telegramId: string) {
   try {
-    console.log('[TELEGRAM DB] Buscando telegramId en DB:', telegramId)
+    // Normalizar el telegramId (eliminar espacios, asegurar que sea string)
+    const normalizedId = String(telegramId).trim()
+    console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId, '(tipo:', typeof normalizedId, ')')
+    
+    // También buscar todos los usuarios para debug
+    const allUsers = await prisma.telegramUser.findMany({ take: 10 })
+    console.log('[TELEGRAM DB] Todos los usuarios en DB:', allUsers.map(u => ({ 
+      id: u.id, 
+      telegramId: u.telegramId, 
+      telegramIdType: typeof u.telegramId,
+      matches: u.telegramId === normalizedId 
+    })))
+    
     const result = await prisma.telegramUser.findUnique({
-      where: { telegramId },
+      where: { telegramId: normalizedId },
       include: {
         User: {
           include: {

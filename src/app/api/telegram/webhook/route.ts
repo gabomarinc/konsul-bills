@@ -60,11 +60,22 @@ export async function POST(req: NextRequest) {
     }
 
     const update = await req.json()
+    const messageText = update.message?.text || update.message?.caption || ''
+    const chatId = update.message?.chat?.id
+    const fromId = update.message?.from?.id
+    
     console.log('[TELEGRAM WEBHOOK] Update recibido:', JSON.stringify({
-      message: update.message?.text,
-      chatId: update.message?.chat?.id,
-      fromId: update.message?.from?.id
+      message: messageText,
+      chatId: chatId,
+      fromId: fromId,
+      updateId: update.update_id
     }))
+    
+    // Si no hay mensaje, podría ser otro tipo de update
+    if (!update.message && !update.edited_message) {
+      console.log('[TELEGRAM WEBHOOK] Update sin mensaje, ignorando:', update.update_id)
+      return NextResponse.json({ ok: true })
+    }
 
     // Procesar el update de forma asíncrona (no esperar respuesta)
     processTelegramUpdate(update).catch((error) => {

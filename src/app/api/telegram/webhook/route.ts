@@ -47,8 +47,10 @@ function getBot(): TelegramBot | null {
  */
 export async function POST(req: NextRequest) {
   try {
+    console.log('[TELEGRAM WEBHOOK] Recibida petición')
     const bot = getBot()
     if (!bot) {
+      console.error('[TELEGRAM WEBHOOK] Bot no configurado')
       return NextResponse.json(
         { error: 'Telegram bot no configurado' },
         { status: 500 }
@@ -56,14 +58,22 @@ export async function POST(req: NextRequest) {
     }
 
     const update = await req.json()
+    console.log('[TELEGRAM WEBHOOK] Update recibido:', JSON.stringify({
+      message: update.message?.text,
+      chatId: update.message?.chat?.id,
+      fromId: update.message?.from?.id
+    }))
 
     // Procesar el update de forma asíncrona (no esperar respuesta)
-    processTelegramUpdate(update).catch(console.error)
+    processTelegramUpdate(update).catch((error) => {
+      console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
+      console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
+    })
 
     // Responder inmediatamente a Telegram (requerido)
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Error en webhook de Telegram:', error)
+    console.error('[TELEGRAM WEBHOOK] Error en webhook:', error)
     return NextResponse.json(
       { error: 'Error procesando webhook' },
       { status: 500 }
@@ -76,7 +86,10 @@ export async function POST(req: NextRequest) {
  */
 async function processTelegramUpdate(update: any) {
   const bot = getBot()
-  if (!bot || !update.message) return
+  if (!bot || !update.message) {
+    console.log('[TELEGRAM] No bot o sin mensaje')
+    return
+  }
 
   const message = update.message
   const chatId = message.chat.id
@@ -86,9 +99,13 @@ async function processTelegramUpdate(update: any) {
   const firstName = message.from?.first_name
   const lastName = message.from?.last_name
 
+  console.log('[TELEGRAM] Procesando mensaje:', { chatId, telegramId, text })
+
   try {
     // Obtener o vincular usuario de Telegram
+    console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
     let telegramUser = await getTelegramUser(telegramId)
+    console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
 
     if (!telegramUser) {
       // Usuario no vinculado - requerir vinculación
@@ -102,9 +119,13 @@ async function processTelegramUpdate(update: any) {
     }
 
     const user = telegramUser.User
+    console.log('[TELEGRAM] Usuario ID:', user.id)
+    
     const company = await getUserCompany(user.id)
+    console.log('[TELEGRAM] Empresa encontrada:', company ? company.id : 'No')
 
     if (!company) {
+      console.error('[TELEGRAM] No hay empresa para el usuario:', user.id)
       await bot.sendMessage(
         chatId,
         '❌ No se encontró una empresa asociada a tu cuenta.'
@@ -118,8 +139,10 @@ async function processTelegramUpdate(update: any) {
 
     // Procesar comandos
     if (text.startsWith('/')) {
+      console.log('[TELEGRAM] Es un comando, llamando handleCommand')
       await handleCommand(chatId, text, conversation, company.id)
     } else {
+      console.log('[TELEGRAM] No es comando, llamando handleConversation')
       // Procesar respuesta según el estado de conversación
       await handleConversation(chatId, text, conversation, company.id)
     }

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type TelegramBot from 'node-telegram-bot-api'
 import {
   getTelegramUser,
   linkTelegramUser,
@@ -17,6 +16,12 @@ import { getUserCompany } from '@/lib/company-utils'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
+// Tipo para el bot (sin importar el módulo)
+type TelegramBot = {
+  sendMessage(chatId: number, text: string, options?: any): Promise<any>;
+  [key: string]: any;
+}
+
 // Función para obtener el bot (solo se inicializa cuando se necesita)
 function getBot(): TelegramBot | null {
   if (!TELEGRAM_BOT_TOKEN) {
@@ -25,8 +30,11 @@ function getBot(): TelegramBot | null {
 
   // Inicializar dinámicamente para evitar problemas en build
   try {
+    // Usar require dinámico para evitar problemas en build time
     const TelegramBotClass = require('node-telegram-bot-api')
-    return new TelegramBotClass(TELEGRAM_BOT_TOKEN)
+    // Intentar con default primero, luego sin default
+    const BotConstructor = TelegramBotClass.default || TelegramBotClass
+    return new BotConstructor(TELEGRAM_BOT_TOKEN) as TelegramBot
   } catch (error) {
     console.error('Error inicializando Telegram bot:', error)
     return null

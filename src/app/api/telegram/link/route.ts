@@ -28,13 +28,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Validar que el telegramId sea un número válido
+    const telegramIdStr = String(telegramId).trim()
+    if (!telegramIdStr || isNaN(Number(telegramIdStr))) {
+      return NextResponse.json(
+        { error: 'El Telegram ID debe ser un número válido' },
+        { status: 400 }
+      )
+    }
+
     // Vincular usuario de Telegram
     const telegramUser = await linkTelegramUser(
-      String(telegramId),
+      telegramIdStr,
       user.userId,
-      username,
-      firstName,
-      lastName
+      username || undefined,
+      firstName || undefined,
+      lastName || undefined
     )
 
     return NextResponse.json({

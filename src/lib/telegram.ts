@@ -92,57 +92,51 @@ export async function linkTelegramUser(
   lastName?: string
 ) {
   try {
-    // Primero verificar si ya existe un usuario con este telegramId
-    const existingByTelegramId = await prisma.telegramUser.findUnique({
-      where: { telegramId }
-    })
-
-    // Verificar si ya existe un usuario con este userId
-    const existingByUserId = await prisma.telegramUser.findUnique({
-      where: { userId }
-    })
-
-    // Si existe por userId pero no por telegramId, actualizar
-    if (existingByUserId && !existingByTelegramId) {
-      return await prisma.telegramUser.update({
-        where: { userId },
-        data: {
-          telegramId,
-          username,
-          firstName,
-          lastName,
-          updatedAt: new Date()
-        }
-      })
-    }
-
-    // Si existe por telegramId, actualizar
-    if (existingByTelegramId) {
-      return await prisma.telegramUser.update({
-        where: { telegramId },
-        data: {
-          userId,
-          username,
-          firstName,
-          lastName,
-          updatedAt: new Date()
-        }
-      })
-    }
-
-    // Si no existe, crear nuevo
-    return await prisma.telegramUser.create({
-      data: {
+    // Usar upsert que maneja mejor los casos edge
+    // Primero intentar con telegramId como clave única
+    const result = await prisma.telegramUser.upsert({
+      where: { telegramId },
+      update: {
+        userId,
+        username: username || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        updatedAt: new Date()
+      },
+      create: {
         id: generateId('telegram'),
         telegramId,
         userId,
-        username,
-        firstName,
-        lastName,
+        username: username || null,
+        firstName: firstName || null,
+        lastName: lastName || null,
         updatedAt: new Date()
       }
     })
-  } catch (error) {
+
+    return result
+  } catch (error: any) {
+    // Si el error es por violación de userId único, intentar actualizar el existente
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('userId')) {
+      // Ya existe un registro con este userId, actualizarlo
+      const existing = await prisma.telegramUser.findUnique({
+        where: { userId }
+      })
+      
+      if (existing) {
+        return await prisma.telegramUser.update({
+          where: { userId },
+          data: {
+            telegramId,
+            username: username || null,
+            firstName: firstName || null,
+            lastName: lastName || null,
+            updatedAt: new Date()
+          }
+        })
+      }
+    }
+    
     console.error('Error en linkTelegramUser:', error)
     throw error
   }

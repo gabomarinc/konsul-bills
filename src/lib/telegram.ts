@@ -61,24 +61,32 @@ export function clearConversationState(telegramId: number) {
  * Obtiene el usuario de la base de datos vinculado a un Telegram ID
  */
 export async function getTelegramUser(telegramId: string) {
-  return await prisma.telegramUser.findUnique({
-    where: { telegramId },
-    include: {
-      User: {
-        include: {
-          Membership: {
-            include: {
-              Company: {
-                include: {
-                  CompanySettings: true
+  try {
+    console.log('[TELEGRAM DB] Buscando telegramId en DB:', telegramId)
+    const result = await prisma.telegramUser.findUnique({
+      where: { telegramId },
+      include: {
+        User: {
+          include: {
+            Membership: {
+              include: {
+                Company: {
+                  include: {
+                    CompanySettings: true
+                  }
                 }
               }
             }
           }
         }
       }
-    }
-  })
+    })
+    console.log('[TELEGRAM DB] Resultado de búsqueda:', result ? `Usuario encontrado: ${result.id}` : 'No encontrado')
+    return result
+  } catch (error) {
+    console.error('[TELEGRAM DB] Error en getTelegramUser:', error)
+    throw error
+  }
 }
 
 /**

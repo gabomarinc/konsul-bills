@@ -121,8 +121,18 @@ async function processTelegramUpdate(update: any) {
   try {
     // Obtener o vincular usuario de Telegram
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
-    let telegramUser = await getTelegramUser(telegramId)
-    console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
+    let telegramUser
+    try {
+      telegramUser = await getTelegramUser(telegramId)
+      console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
+      if (telegramUser) {
+        console.log('[TELEGRAM] Usuario encontrado - ID:', telegramUser.id, 'UserId:', telegramUser.userId)
+      }
+    } catch (error) {
+      console.error('[TELEGRAM] Error buscando usuario:', error)
+      console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
+      throw error
+    }
     
     if (!telegramUser) {
       console.log('[TELEGRAM] Usuario no encontrado. TelegramId:', telegramId)

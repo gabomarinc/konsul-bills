@@ -125,10 +125,18 @@ async function processTelegramUpdate(update: any) {
     }
   } catch (error) {
     console.error('Error procesando mensaje:', error)
-    await bot.sendMessage(
-      chatId,
-      '❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta de nuevo.'
-    )
+    const bot = getBot()
+    if (bot) {
+      try {
+        await bot.sendMessage(
+          chatId,
+          '❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta de nuevo.\n\n' +
+          `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`
+        )
+      } catch (sendError) {
+        console.error('Error enviando mensaje de error:', sendError)
+      }
+    }
   }
 }
 
@@ -142,11 +150,16 @@ async function handleCommand(
   companyId: string
 ) {
   const bot = getBot()
-  if (!bot) return
+  if (!bot) {
+    console.error('Bot no inicializado en handleCommand')
+    return
+  }
 
   const cmd = command.split(' ')[0].toLowerCase()
+  console.log('Procesando comando:', cmd, 'para chatId:', chatId)
 
-  switch (cmd) {
+  try {
+    switch (cmd) {
     case '/start':
       await bot.sendMessage(
         chatId,
@@ -218,6 +231,18 @@ async function handleCommand(
         chatId,
         '❌ Comando no reconocido. Usa /ayuda para ver los comandos disponibles.'
       )
+    }
+  } catch (error) {
+    console.error('Error en handleCommand:', error)
+    try {
+      await bot.sendMessage(
+        chatId,
+        '❌ Error al procesar el comando. Por favor, intenta de nuevo.\n\n' +
+        `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`
+      )
+    } catch (sendError) {
+      console.error('Error enviando mensaje de error:', sendError)
+    }
   }
 }
 

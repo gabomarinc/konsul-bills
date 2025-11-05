@@ -65,34 +65,34 @@ model Company {
 }
 
 model CompanySettings {
-  id                    String  @id
-  companyId             String  @unique
-  logoUrl               String?
-  primaryColor          String?
-  accentColor           String?
-  legalName             String?
-  taxId                 String?
-  emailFrom             String?
-  phone                 String?
-  website               String?
-  addressLine1          String?
-  addressLine2          String?
-  city                  String?
-  state                 String?
-  zip                   String?
-  country               String?
-  defaultCurrency       String  @default("EUR")
-  defaultTaxRate        Float   @default(21)
-  locale                String  @default("es-ES")
-  timezone              String  @default("Europe/Madrid")
-  quotePrefix           String  @default("Q-")
-  invoicePrefix         String  @default("INV-")
-  numberPadding         Int     @default(5)
+  id                   String  @id
+  companyId            String  @unique
+  logoUrl              String?
+  primaryColor         String?
+  accentColor          String?
+  legalName            String?
+  taxId                String?
+  emailFrom            String?
+  phone                String?
+  website              String?
+  addressLine1         String?
+  addressLine2         String?
+  city                 String?
+  state                String?
+  zip                  String?
+  country              String?
+  defaultCurrency      String  @default("EUR")
+  defaultTaxRate       Float   @default(21)
+  locale               String  @default("es-ES")
+  timezone             String  @default("Europe/Madrid")
+  quotePrefix          String  @default("Q-")
+  invoicePrefix        String  @default("INV-")
+  numberPadding        Int     @default(5)
   // Stripe Integration
-  stripeEnabled         Boolean @default(false)
-  stripeSecretKey       String? // Encrypted
-  stripePublishableKey  String?
-  Company               Company @relation(fields: [companyId], references: [id])
+  stripeEnabled        Boolean @default(false)
+  stripeSecretKey      String? // Encrypted
+  stripePublishableKey String?
+  Company              Company @relation(fields: [companyId], references: [id])
 }
 
 model Invoice {
@@ -213,17 +213,31 @@ model Session {
 }
 
 model User {
-  id          String       @id
-  email       String       @unique
-  name        String?
-  password    String?      // Campo para contraseñas hasheadas
-  image       String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime
-  Account     Account[]
-  Membership  Membership[]
-  Session     Session[]
-  UserProfile UserProfile?
+  id           String        @id
+  email        String        @unique
+  name         String?
+  password     String? // Campo para contraseñas hasheadas
+  image        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime
+  Account      Account[]
+  Membership   Membership[]
+  Session      Session[]
+  UserProfile  UserProfile?
+  TelegramUser TelegramUser?
+}
+
+model TelegramUser {
+  id         String   @id
+  telegramId String   @unique
+  userId     String   @unique
+  username   String?
+  firstName  String?
+  lastName   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+  User       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserProfile {
@@ -255,37 +269,37 @@ model UserProfile {
 }
 
 model RecurringInvoice {
-  id              String                 @id
-  companyId       String
-  clientId        String
-  title           String
-  description     String?
+  id            String                 @id
+  companyId     String
+  clientId      String
+  title         String
+  description   String?
   // Configuración de recurrencia
-  frequency       String                 // "MONTHLY", "WEEKLY", "YEARLY"
-  intervalValue   Int                    @default(1)
-  dayOfMonth      Int?                   // 1-31 (para mensual)
-  dayOfWeek       Int?                   // 0-6 (para semanal)
+  frequency     String // "MONTHLY", "WEEKLY", "YEARLY"
+  intervalValue Int                    @default(1)
+  dayOfMonth    Int? // 1-31 (para mensual)
+  dayOfWeek     Int? // 0-6 (para semanal)
   // Fechas
-  startDate       DateTime
-  endDate         DateTime?
-  nextRunDate     DateTime
-  lastRunDate     DateTime?
+  startDate     DateTime
+  endDate       DateTime?
+  nextRunDate   DateTime
+  lastRunDate   DateTime?
   // Datos de la factura
-  currency        String                 @default("EUR")
-  tax             Float                  @default(21)
-  subtotal        Float                  @default(0)
-  taxAmount       Float                  @default(0)
-  total           Float                  @default(0)
-  dueInDays       Int                    @default(30)
-  notes           String?
+  currency      String                 @default("EUR")
+  tax           Float                  @default(21)
+  subtotal      Float                  @default(0)
+  taxAmount     Float                  @default(0)
+  total         Float                  @default(0)
+  dueInDays     Int                    @default(30)
+  notes         String?
   // Estado
-  isActive        Boolean                @default(true)
+  isActive      Boolean                @default(true)
   // Relaciones
-  Company         Company                @relation(fields: [companyId], references: [id])
-  Client          Client                 @relation(fields: [clientId], references: [id])
-  RecurringItem   RecurringInvoiceItem[]
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime
+  Company       Company                @relation(fields: [companyId], references: [id])
+  Client        Client                 @relation(fields: [clientId], references: [id])
+  RecurringItem RecurringInvoiceItem[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime
 
   @@index([companyId, nextRunDate])
   @@index([companyId, isActive])

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useTranslation } from "@/contexts/LanguageContext"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,7 +25,8 @@ import {
   FileText,
   AlertTriangle,
   ExternalLink,
-  CreditCard
+  CreditCard,
+  MessageCircle
 } from "lucide-react"
 
 
@@ -71,6 +72,17 @@ export default function SettingsPage() {
 
   const [stripeDialogOpen, setStripeDialogOpen] = useState(false)
 
+  const [telegramSettings, setTelegramSettings] = useState({
+    linked: false,
+    telegramId: "",
+    username: "",
+    firstName: "",
+    lastName: ""
+  })
+
+  const [telegramDialogOpen, setTelegramDialogOpen] = useState(false)
+  const [telegramIdInput, setTelegramIdInput] = useState("")
+
 
   const handleProfileUpdate = () => {
     console.log("Updating profile:", profileSettings)
@@ -110,6 +122,99 @@ export default function SettingsPage() {
     } catch (error) {
       console.error("Error saving Stripe config:", error)
       alert("Error al guardar configuración de Stripe")
+    }
+  }
+
+  // Cargar estado de Telegram al montar el componente
+  useEffect(() => {
+    const loadTelegramStatus = async () => {
+      try {
+        const response = await fetch("/api/telegram/link", {
+          credentials: "include"
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setTelegramSettings({
+            linked: data.linked,
+            telegramId: data.telegramUser?.telegramId || "",
+            username: data.telegramUser?.username || "",
+            firstName: data.telegramUser?.firstName || "",
+            lastName: data.telegramUser?.lastName || ""
+          })
+        }
+      } catch (error) {
+        console.error("Error loading Telegram status:", error)
+      }
+    }
+    loadTelegramStatus()
+  }, [])
+
+  const handleTelegramLink = async () => {
+    if (!telegramIdInput.trim()) {
+      alert("Por favor, ingresa tu Telegram ID")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          telegramId: telegramIdInput.trim(),
+          username: telegramSettings.username,
+          firstName: telegramSettings.firstName,
+          lastName: telegramSettings.lastName
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al vincular cuenta")
+      }
+
+      const data = await response.json()
+      setTelegramSettings({
+        linked: true,
+        telegramId: data.telegramUser.telegramId,
+        username: data.telegramUser.username || "",
+        firstName: telegramSettings.firstName,
+        lastName: telegramSettings.lastName
+      })
+      setTelegramDialogOpen(false)
+      setTelegramIdInput("")
+      alert("✅ Cuenta de Telegram vinculada exitosamente")
+    } catch (error) {
+      console.error("Error linking Telegram:", error)
+      alert("Error al vincular cuenta de Telegram")
+    }
+  }
+
+  const handleTelegramUnlink = async () => {
+    if (!confirm("¿Estás seguro de que quieres desvincular tu cuenta de Telegram?")) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/telegram/link", {
+        method: "DELETE",
+        credentials: "include"
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al desvincular cuenta")
+      }
+
+      setTelegramSettings({
+        linked: false,
+        telegramId: "",
+        username: "",
+        firstName: "",
+        lastName: ""
+      })
+      alert("✅ Cuenta de Telegram desvinculada")
+    } catch (error) {
+      console.error("Error unlinking Telegram:", error)
+      alert("Error al desvincular cuenta de Telegram")
     }
   }
 
@@ -518,6 +623,44 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
+
+                {/* Telegram Integration */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <MessageCircle className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Telegram</h4>
+                      <p className="text-sm text-slate-600">Crea facturas y cotizaciones desde Telegram</p>
+                      {telegramSettings.linked && telegramSettings.username && (
+                        <p className="text-xs text-slate-500 mt-1">@{telegramSettings.username}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={telegramSettings.linked ? "default" : "secondary"}>
+                      {telegramSettings.linked ? "Vinculado" : "No vinculado"}
+                    </Badge>
+                    {telegramSettings.linked ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleTelegramUnlink}
+                      >
+                        Desvincular
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTelegramDialogOpen(true)}
+                      >
+                        Vincular
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 
                 <div className="mt-6">
                   <h4 className="font-medium mb-3 text-slate-600">{t.settings.comingSoon}</h4>
@@ -562,6 +705,75 @@ export default function SettingsPage() {
             </Card>
           </div>
         </div>
+
+        {/* Telegram Link Dialog */}
+        <Dialog open={telegramDialogOpen} onOpenChange={setTelegramDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <DialogTitle>Vincular cuenta de Telegram</DialogTitle>
+                  <DialogDescription>
+                    Conecta tu cuenta de Telegram para usar el bot
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label htmlFor="telegram-id" className="text-sm font-medium">
+                  Tu Telegram ID
+                </label>
+                <Input
+                  id="telegram-id"
+                  type="text"
+                  placeholder="123456789"
+                  value={telegramIdInput}
+                  onChange={(e) => setTelegramIdInput(e.target.value)}
+                />
+                <p className="text-xs text-slate-500">
+                  Para obtener tu ID, busca @userinfobot en Telegram y envía /start
+                </p>
+              </div>
+              
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">¿Cómo obtener tu Telegram ID?</h4>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Abre Telegram y busca <code className="bg-blue-100 px-1 rounded">@userinfobot</code></li>
+                  <li>Envía el comando <code className="bg-blue-100 px-1 rounded">/start</code></li>
+                  <li>El bot te mostrará tu ID (número)</li>
+                  <li>Copia ese número y pégalo aquí</li>
+                </ol>
+                <a 
+                  href="https://t.me/userinfobot" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-2 inline-flex items-center gap-1"
+                >
+                  Abrir @userinfobot en Telegram
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTelegramDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleTelegramLink}
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={!telegramIdInput.trim()}
+              >
+                Vincular cuenta
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Stripe Configuration Dialog */}
         <Dialog open={stripeDialogOpen} onOpenChange={setStripeDialogOpen}>

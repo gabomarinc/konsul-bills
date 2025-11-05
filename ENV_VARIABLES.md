@@ -76,6 +76,26 @@ RATE_LIMIT_WINDOW_MS="900000"
 
 Tienen valores por defecto, solo configúralas si necesitas cambiarlos.
 
+## Telegram Bot (OPCIONAL - solo si usas el chatbot)
+
+```bash
+TELEGRAM_BOT_TOKEN="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+```
+
+**Obtener el token:**
+1. Abre Telegram y busca `@BotFather`
+2. Envía el comando `/newbot`
+3. Sigue las instrucciones para crear tu bot
+4. BotFather te dará un token que debes usar aquí
+5. Configura el webhook en Telegram apuntando a: `https://tu-dominio.vercel.app/api/telegram/webhook`
+
+**Configurar el webhook:**
+```bash
+curl -X POST "https://api.telegram.org/bot<TU_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://tu-dominio.vercel.app/api/telegram/webhook"}'
+```
+
 ---
 
 ## Configuración en Vercel
@@ -102,6 +122,8 @@ Tienen valores por defecto, solo configúralas si necesitas cambiarlos.
    - `DIRECT_URL` = copia el valor de `POSTGRES_URL_NON_POOLING`
 
 Después de configurar todo, redeploya tu aplicación.
+
+
 
 
 

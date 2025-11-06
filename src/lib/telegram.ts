@@ -27,6 +27,10 @@ export interface ConversationData {
     items?: Array<{ description: string; qty: number; price: number }>
     currentItem?: { description?: string; qty?: number; price?: number }
     similarClients?: Array<{ id: string; name: string; email?: string | null }>
+    currency?: string
+    tax?: number
+    actions?: string[]
+    aiParsed?: boolean
   }
 }
 

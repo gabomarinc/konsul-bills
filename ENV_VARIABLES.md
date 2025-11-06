@@ -96,6 +96,26 @@ curl -X POST "https://api.telegram.org/bot<TU_TOKEN>/setWebhook" \
   -d '{"url": "https://tu-dominio.vercel.app/api/telegram/webhook"}'
 ```
 
+## IA para Telegram (OPCIONAL - para lenguaje natural)
+
+El bot puede procesar lenguaje natural usando OpenAI o Gemini. Solo necesitas una de estas variables:
+
+**Opción 1: OpenAI (Recomendado)**
+```bash
+OPENAI_API_KEY="sk-..."
+```
+
+**Opción 2: Gemini**
+```bash
+GEMINI_API_KEY="..."
+```
+
+**Obtener las API Keys:**
+- **OpenAI**: https://platform.openai.com/api-keys
+- **Gemini**: https://makersuite.google.com/app/apikey
+
+**Nota:** Si no configuras ninguna, el bot funcionará con comandos normales pero no procesará lenguaje natural.
+
 ---
 
 ## Configuración en Vercel

@@ -190,13 +190,21 @@ async function processTelegramUpdate(update: any) {
     }
   }
 
+  // Timeout global para asegurar que SIEMPRE respondamos
+  const timeoutPromise = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Global timeout - forzando respuesta')), 8000)
+  )
+
   try {
-    // Obtener o vincular usuario de Telegram
+    // Obtener o vincular usuario de Telegram con timeout global
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
     let telegramUser
     try {
       console.log('[TELEGRAM] 🔵 ANTES de getTelegramUser')
-      telegramUser = await getTelegramUser(telegramId)
+      telegramUser = await Promise.race([
+        getTelegramUser(telegramId),
+        timeoutPromise
+      ]) as any
       console.log('[TELEGRAM] 🟢 DESPUÉS de getTelegramUser')
       console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
       if (telegramUser) {

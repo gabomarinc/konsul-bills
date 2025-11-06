@@ -121,6 +121,23 @@ async function processTelegramUpdate(update: any) {
 
   console.log('[TELEGRAM] Procesando mensaje:', { chatId, telegramId, text, updateId: update.update_id })
 
+  // Función helper para enviar mensaje de error
+  const sendErrorMessage = async (errorMsg: string) => {
+    if (!bot) {
+      console.error('[TELEGRAM] ❌ Bot no disponible para enviar mensaje de error')
+      return
+    }
+    try {
+      console.log('[TELEGRAM] Enviando mensaje de error a chatId:', chatId)
+      const result = await bot.sendMessage(chatId, errorMsg)
+      console.log('[TELEGRAM] ✅ Mensaje de error enviado. Message ID:', result?.message_id)
+      return result
+    } catch (sendErr: any) {
+      console.error('[TELEGRAM] ❌ Error enviando mensaje de error:', sendErr?.message || sendErr)
+      return null
+    }
+  }
+
   try {
     // Obtener o vincular usuario de Telegram
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
@@ -147,78 +164,45 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] ChatId:', chatId, 'TelegramId:', telegramId)
       console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error')
       
-      // Asegurarse de que el bot esté disponible
-      if (!bot) {
-        console.error('[TELEGRAM] ❌ Bot no disponible para enviar mensaje')
-        return
+      // Preparar mensaje según el comando
+      const command = text.toLowerCase().trim()
+      const isStart = command === '/start' || command === 'hola' || command === 'hi'
+      const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura')
+      const isCreateQuote = command === '/crear_cotizacion' || command.startsWith('/crear_cotizacion')
+      
+      let messageText = ''
+      
+      if (isStart) {
+        messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+          '⚠️ Hay un problema temporal con la base de datos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Comandos disponibles:\n' +
+          '/crear_factura - Crear una factura\n' +
+          '/crear_cotizacion - Crear una cotización\n' +
+          '/clientes - Ver tus clientes\n' +
+          '/ayuda - Ver ayuda'
+      } else if (isCreateInvoice) {
+        messageText = '📝 Para crear una factura, necesito acceso a la base de datos.\n\n' +
+          '⚠️ Hay un problema temporal de conexión.\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
+      } else if (isCreateQuote) {
+        messageText = '📋 Para crear una cotización, necesito acceso a la base de datos.\n\n' +
+          '⚠️ Hay un problema temporal de conexión.\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
+      } else {
+        messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Escribe /start para comenzar.'
       }
       
-      // Intentar enviar mensaje SIEMPRE, sin importar el tipo de error
-      try {
-        const command = text.toLowerCase().trim()
-        const isStart = command === '/start' || command === 'hola' || command === 'hi'
-        const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura')
-        const isCreateQuote = command === '/crear_cotizacion' || command.startsWith('/crear_cotizacion')
-        
-        let messageText = ''
-        
-        if (isStart) {
-          messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
-            '⚠️ Hay un problema temporal con la base de datos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Comandos disponibles:\n' +
-            '/crear_factura - Crear una factura\n' +
-            '/crear_cotizacion - Crear una cotización\n' +
-            '/clientes - Ver tus clientes\n' +
-            '/ayuda - Ver ayuda'
-        } else if (isCreateInvoice) {
-          messageText = '📝 Para crear una factura, necesito acceso a la base de datos.\n\n' +
-            '⚠️ Hay un problema temporal de conexión.\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
-        } else if (isCreateQuote) {
-          messageText = '📋 Para crear una cotización, necesito acceso a la base de datos.\n\n' +
-            '⚠️ Hay un problema temporal de conexión.\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
-        } else {
-          messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Escribe /start para comenzar.'
-        }
-        
-        console.log('[TELEGRAM] Intentando enviar mensaje a chatId:', chatId)
-        console.log('[TELEGRAM] Mensaje:', messageText.substring(0, 50) + '...')
-        
-        const errorMessage = await bot.sendMessage(chatId, messageText)
-        console.log('[TELEGRAM] ✅ Mensaje enviado exitosamente. Message ID:', errorMessage?.message_id)
-        console.log('[TELEGRAM] ✅ Respuesta completa:', JSON.stringify(errorMessage))
-      } catch (sendError: any) {
-        console.error('[TELEGRAM] ❌ Error enviando mensaje después de error de BD:', sendError?.message || sendError)
-        console.error('[TELEGRAM] ❌ Error completo:', JSON.stringify({
-          code: sendError?.code,
-          message: sendError?.message,
-          response: sendError?.response
-        }))
-        
-        // Último intento con mensaje muy simple
-        try {
-          console.log('[TELEGRAM] Intentando mensaje de fallback...')
-          const fallbackResult = await bot.sendMessage(chatId, '👋 Hola! Tu ID: ' + telegramId + '. Error temporal, intenta más tarde.')
-          console.log('[TELEGRAM] ✅ Mensaje de fallback enviado. Message ID:', fallbackResult?.message_id)
-        } catch (finalError: any) {
-          console.error('[TELEGRAM] ❌ Error crítico enviando mensaje de fallback:', finalError?.message || finalError)
-          console.error('[TELEGRAM] ❌ Error completo:', JSON.stringify({
-            code: finalError?.code,
-            message: finalError?.message,
-            response: finalError?.response
-          }))
-        }
-      }
+      // Intentar enviar mensaje usando la función helper
+      await sendErrorMessage(messageText)
       return // Salir sin lanzar el error para que el webhook responda 200
     }
     
@@ -327,29 +311,22 @@ async function processTelegramUpdate(update: any) {
     }
     
     console.log('[TELEGRAM] Procesamiento de mensaje completado exitosamente')
-  } catch (error) {
-    console.error('[TELEGRAM] Error procesando mensaje:', error)
+  } catch (error: any) {
+    console.error('[TELEGRAM] ❌ Error procesando mensaje:', error?.message || error)
+    console.error('[TELEGRAM] Error completo:', JSON.stringify({
+      code: error?.code,
+      message: error?.message,
+      name: error?.name
+    }))
     console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
     
-    const bot = getBot()
-    if (bot) {
-      try {
-        console.log('[TELEGRAM] Intentando enviar mensaje de error a chatId:', chatId)
-        const errorMessage = await bot.sendMessage(
-          chatId,
-          '❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta de nuevo.\n\n' +
-          `Error: ${error instanceof Error ? error.message : 'Error desconocido'}\n\n` +
-          'Si el problema persiste, escribe /ayuda para obtener ayuda.'
-        )
-        console.log('[TELEGRAM] Mensaje de error enviado exitosamente:', errorMessage?.message_id)
-      } catch (sendError) {
-        console.error('[TELEGRAM] Error enviando mensaje de error:', sendError)
-        console.error('[TELEGRAM] Error details:', sendError instanceof Error ? sendError.message : 'Unknown error')
-        console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
-      }
-    } else {
-      console.error('[TELEGRAM] Bot no disponible para enviar mensaje de error')
-    }
+    // Asegurar que SIEMPRE se envíe un mensaje, incluso si hay errores
+    const errorMsg = '❌ Ocurrió un error al procesar tu mensaje.\n\n' +
+      'Por favor, intenta de nuevo en unos segundos.\n\n' +
+      `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+      'Escribe /start para comenzar.'
+    
+    await sendErrorMessage(errorMsg)
   }
 }
 

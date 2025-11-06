@@ -82,9 +82,30 @@ export async function POST(req: NextRequest) {
 
     // Procesar el update de forma asíncrona (no esperar respuesta)
     // IMPORTANTE: No usar await aquí para responder rápido a Telegram
-    processTelegramUpdate(update).catch((error) => {
+    processTelegramUpdate(update).catch(async (error) => {
       console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
       console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
+      
+      // Intentar enviar mensaje de error incluso si falló todo
+      try {
+        const bot = getBot()
+        const chatId = update.message?.chat?.id || update.edited_message?.chat?.id
+        const telegramId = String(update.message?.from?.id || update.edited_message?.from?.id)
+        
+        if (bot && chatId) {
+          console.log('[TELEGRAM WEBHOOK] Intentando enviar mensaje de error desde catch principal')
+          await bot.sendMessage(
+            chatId,
+            '⚠️ Error al procesar tu mensaje.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+            'Escribe /start para comenzar.'
+          )
+          console.log('[TELEGRAM WEBHOOK] ✅ Mensaje de error enviado desde catch principal')
+        }
+      } catch (sendErr) {
+        console.error('[TELEGRAM WEBHOOK] ❌ Error enviando mensaje desde catch principal:', sendErr)
+      }
     })
 
     // Responder inmediatamente a Telegram (requerido por la API de Telegram)
@@ -162,12 +183,14 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] ⚠️ Error al buscar usuario, tratando como usuario no vinculado')
       console.log('[TELEGRAM] Bot disponible?', bot ? 'Sí' : 'No')
       console.log('[TELEGRAM] ChatId:', chatId, 'TelegramId:', telegramId)
+      console.log('[TELEGRAM] Text recibido:', text)
       console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error')
       
       // Preparar mensaje según el comando
       const command = text.toLowerCase().trim()
+      console.log('[TELEGRAM] Comando detectado:', command)
       const isStart = command === '/start' || command === 'hola' || command === 'hi'
-      const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura')
+      const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura') || text.toLowerCase().includes('crear') && text.toLowerCase().includes('factura')
       const isCreateQuote = command === '/crear_cotizacion' || command.startsWith('/crear_cotizacion')
       
       let messageText = ''
@@ -201,8 +224,13 @@ async function processTelegramUpdate(update: any) {
           'Escribe /start para comenzar.'
       }
       
+      console.log('[TELEGRAM] Mensaje preparado:', messageText.substring(0, 100) + '...')
+      console.log('[TELEGRAM] Llamando a sendErrorMessage...')
+      
       // Intentar enviar mensaje usando la función helper
-      await sendErrorMessage(messageText)
+      const sendResult = await sendErrorMessage(messageText)
+      console.log('[TELEGRAM] Resultado de sendErrorMessage:', sendResult ? 'Éxito' : 'Falló')
+      
       return // Salir sin lanzar el error para que el webhook responda 200
     }
     

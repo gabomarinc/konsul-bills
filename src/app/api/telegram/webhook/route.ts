@@ -219,20 +219,42 @@ async function processTelegramUpdate(update: any) {
   // Función para enviar respuesta inmediata (sin esperar BD)
   // CRÍTICO: Esta función DEBE completarse antes de que termine la función de Vercel
   const sendImmediateResponse = async (message: string) => {
-    try {
-      console.log('[TELEGRAM] 🚀🚀🚀 ENVIANDO RESPUESTA INMEDIATA 🚀🚀🚀')
-      console.log('[TELEGRAM] Mensaje:', message.substring(0, 100) + '...')
-      console.log('[TELEGRAM] ChatId:', chatId)
-      console.log('[TELEGRAM] Bot disponible?', bot ? 'Sí' : 'No')
-      
-      if (!bot) {
-        console.error('[TELEGRAM] ❌ Bot no disponible')
+    console.log('[TELEGRAM] 🚀🚀🚀 ENVIANDO RESPUESTA INMEDIATA 🚀🚀🚀')
+    console.log('[TELEGRAM] Mensaje:', message.substring(0, 100) + '...')
+    console.log('[TELEGRAM] ChatId:', chatId)
+    console.log('[TELEGRAM] Bot disponible?', bot ? 'Sí' : 'No')
+    
+    if (!bot) {
+      console.error('[TELEGRAM] ❌ Bot no disponible, obteniendo nuevo bot...')
+      const newBot = getBot()
+      if (!newBot) {
+        console.error('[TELEGRAM] ❌ No se pudo obtener bot')
         return null
       }
-      
-      // Enviar directamente sin Promise.race para asegurar que se complete
+      // Usar el nuevo bot
+      try {
+        console.log('[TELEGRAM] Llamando bot.sendMessage con nuevo bot...')
+        const result = await newBot.sendMessage(chatId, message)
+        console.log('[TELEGRAM] ✅✅✅ RESPUESTA ENVIADA EXITOSAMENTE. Message ID:', result?.message_id)
+        return result
+      } catch (err: any) {
+        console.error('[TELEGRAM] ❌ Error con nuevo bot:', err?.message)
+        return null
+      }
+    }
+    
+    try {
+      // Enviar directamente - CRÍTICO: usar await para asegurar que se complete
       console.log('[TELEGRAM] Llamando bot.sendMessage...')
-      const result = await bot.sendMessage(chatId, message)
+      console.log('[TELEGRAM] ChatId:', chatId, 'Message length:', message.length)
+      
+      // Asegurarnos de que el bot esté inicializado
+      const botToUse = bot || getBot()
+      if (!botToUse) {
+        throw new Error('Bot no disponible después de getBot()')
+      }
+      
+      const result = await botToUse.sendMessage(chatId, message)
       console.log('[TELEGRAM] ✅✅✅ RESPUESTA ENVIADA EXITOSAMENTE. Message ID:', result?.message_id)
       console.log('[TELEGRAM] Resultado completo:', JSON.stringify(result))
       return result
@@ -241,13 +263,15 @@ async function processTelegramUpdate(update: any) {
       console.error('[TELEGRAM] Error:', err?.message || err)
       console.error('[TELEGRAM] Error code:', err?.code)
       console.error('[TELEGRAM] Error response:', err?.response ? JSON.stringify(err.response) : 'No response')
+      console.error('[TELEGRAM] Error stack:', err instanceof Error ? err.stack : 'No stack')
       
       // Último intento con timeout más corto
-      if (bot) {
+      const botToUse = bot || getBot()
+      if (botToUse) {
         try {
           console.log('[TELEGRAM] 🔄 Último intento con timeout...')
           const fallbackResult = await Promise.race([
-            bot.sendMessage(chatId, message),
+            botToUse.sendMessage(chatId, message),
             new Promise((_, reject) => 
               setTimeout(() => reject(new Error('Timeout final')), 3000)
             )

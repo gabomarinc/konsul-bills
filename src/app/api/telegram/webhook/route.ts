@@ -13,6 +13,7 @@ import {
   formatClientsList
 } from '@/lib/telegram'
 import { getUserCompany } from '@/lib/company-utils'
+import { parseNaturalLanguage } from '@/lib/telegram-ai'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
@@ -187,9 +188,16 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] Es un comando, llamando handleCommand')
       await handleCommand(chatId, text, conversation, company.id)
     } else {
-      console.log('[TELEGRAM] No es comando, llamando handleConversation')
-      // Procesar respuesta según el estado de conversación
-      await handleConversation(chatId, text, conversation, company.id)
+      // Verificar si hay un estado de conversación activo
+      if (conversation.state !== 'idle') {
+        console.log('[TELEGRAM] No es comando, llamando handleConversation (estado activo)')
+        // Procesar respuesta según el estado de conversación
+        await handleConversation(chatId, text, conversation, company.id)
+      } else {
+        // Estado idle: intentar procesar como lenguaje natural con IA
+        console.log('[TELEGRAM] Estado idle, intentando procesar con IA')
+        await handleNaturalLanguage(chatId, text, conversation, company.id)
+      }
     }
   } catch (error) {
     console.error('Error procesando mensaje:', error)
@@ -320,6 +328,90 @@ async function handleCommand(
 }
 
 /**
+ * Maneja lenguaje natural usando IA
+ */
+async function handleNaturalLanguage(
+  chatId: number,
+  text: string,
+  conversation: any,
+  companyId: string
+) {
+  const bot = getBot()
+  if (!bot) return
+
+  try {
+    console.log('[TELEGRAM AI] Procesando lenguaje natural:', text)
+    
+    // Obtener clientes disponibles para el contexto
+    const clients = await getCompanyClients(companyId)
+    
+    // Procesar con IA
+    const parsed = await parseNaturalLanguage(text, clients)
+    
+    console.log('[TELEGRAM AI] Intent detectado:', parsed.intent, 'Confidence:', parsed.confidence)
+    
+    if (parsed.intent === 'create_invoice' || parsed.intent === 'create_quote') {
+      // Confirmar con el usuario antes de crear
+      const type = parsed.intent === 'create_invoice' ? 'factura' : 'cotización'
+      let confirmMessage = `📝 Entendido, quieres crear una ${type}:\n\n`
+      
+      if (parsed.clientName) {
+        confirmMessage += `👤 Cliente: ${parsed.clientName}\n`
+      }
+      if (parsed.title) {
+        confirmMessage += `📋 Título: ${parsed.title}\n`
+      }
+      if (parsed.items && parsed.items.length > 0) {
+        confirmMessage += `💰 Items:\n`
+        parsed.items.forEach(item => {
+          confirmMessage += `  • ${item.description}: ${item.qty} x ${item.price} ${parsed.currency || 'EUR'}\n`
+        })
+      }
+      if (parsed.actions && parsed.actions.includes('send_email')) {
+        confirmMessage += `📧 Se enviará por email\n`
+      }
+      
+      confirmMessage += `\n¿Confirmas? Responde "sí" para crear o "no" para cancelar.`
+      
+      // Guardar el intent parseado en el estado
+      setConversationState(chatId, {
+        state: parsed.intent === 'create_invoice' ? 'creating_invoice_client' : 'creating_quote_client',
+        draft: {
+          type: parsed.intent === 'create_invoice' ? 'invoice' : 'quote',
+          clientName: parsed.clientName,
+          clientEmail: parsed.clientEmail,
+          title: parsed.title,
+          items: parsed.items,
+          currency: parsed.currency,
+          tax: parsed.tax,
+          actions: parsed.actions,
+          aiParsed: true // Flag para indicar que viene de IA
+        }
+      })
+      
+      await bot.sendMessage(chatId, confirmMessage)
+    } else if (parsed.intent === 'list_clients') {
+      const clientsList = formatClientsList(clients)
+      await bot.sendMessage(chatId, `📋 Tus clientes:\n\n${clientsList}`)
+    } else {
+      await bot.sendMessage(
+        chatId,
+        '🤔 No entendí tu solicitud. Puedes:\n\n' +
+        '• Usar comandos: /crear_factura, /crear_cotizacion\n' +
+        '• Escribir en lenguaje natural: "Crea una cotización de 600 dólares para Omar Ortiz"\n' +
+        '• Usar /ayuda para más información'
+      )
+    }
+  } catch (error) {
+    console.error('[TELEGRAM AI] Error procesando lenguaje natural:', error)
+    await bot.sendMessage(
+      chatId,
+      '❌ Error al procesar tu mensaje. Por favor, intenta usar comandos como /crear_factura'
+    )
+  }
+}
+
+/**
  * Maneja conversaciones según el estado actual
  */
 async function handleConversation(
@@ -332,6 +424,77 @@ async function handleConversation(
   if (!bot) return
 
   const state = conversation.state
+  const draft = conversation.draft || {}
+
+  // Si viene de IA y el usuario confirma, crear directamente
+  if (draft.aiParsed && (text.toLowerCase().trim() === 'sí' || text.toLowerCase().trim() === 'si' || text.toLowerCase().trim() === 'yes')) {
+    console.log('[TELEGRAM] Confirmación de IA recibida, creando directamente')
+    
+    try {
+      if (!conversation.userId) throw new Error('User ID not found')
+      const company = await getUserCompany(conversation.userId)
+      if (!company) throw new Error('Company not found')
+
+      // Asegurar cliente
+      if (draft.clientName) {
+        const client = await ensureClient(company.id, draft.clientName, draft.clientEmail)
+        draft.clientId = client.id
+      }
+
+      if (!draft.clientId) {
+        await bot.sendMessage(chatId, '❌ Falta el nombre del cliente. Por favor, especifica el cliente.')
+        return
+      }
+
+      if (draft.type === 'invoice') {
+        const invoice = await createInvoiceFromConversation(company.id, conversation)
+        await bot.sendMessage(
+          chatId,
+          `✅ Factura creada exitosamente!\n\n` +
+          `ID: ${invoice.id}\n` +
+          `Cliente: ${draft.clientName}\n` +
+          `Título: ${draft.title || 'Factura'}\n` +
+          `Total: ${invoice.total.toFixed(2)} ${invoice.currency}`
+        )
+        
+        // TODO: Implementar envío de email si está en actions
+        if (draft.actions && draft.actions.includes('send_email')) {
+          await bot.sendMessage(chatId, '📧 Email enviado al cliente')
+        }
+      } else {
+        const quote = await createQuoteFromConversation(company.id, conversation)
+        await bot.sendMessage(
+          chatId,
+          `✅ Cotización creada exitosamente!\n\n` +
+          `ID: ${quote.id}\n` +
+          `Cliente: ${draft.clientName}\n` +
+          `Título: ${draft.title || 'Cotización'}\n` +
+          `Total: ${quote.total.toFixed(2)} ${quote.currency}`
+        )
+        
+        // TODO: Implementar envío de email si está en actions
+        if (draft.actions && draft.actions.includes('send_email')) {
+          await bot.sendMessage(chatId, '📧 Email enviado al cliente')
+        }
+      }
+
+      clearConversationState(chatId)
+    } catch (error) {
+      console.error('Error creando desde IA:', error)
+      await bot.sendMessage(
+        chatId,
+        '❌ Error al crear. Por favor, intenta de nuevo.'
+      )
+    }
+    return
+  }
+
+  // Si el usuario cancela
+  if (draft.aiParsed && (text.toLowerCase().trim() === 'no' || text.toLowerCase().trim() === 'cancelar')) {
+    clearConversationState(chatId)
+    await bot.sendMessage(chatId, '✅ Operación cancelada.')
+    return
+  }
 
   // Verificar si hay clientes similares antes de crear uno nuevo
   if (state === 'creating_invoice_client' || state === 'creating_quote_client') {

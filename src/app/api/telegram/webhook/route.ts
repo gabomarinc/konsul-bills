@@ -13,7 +13,7 @@ import {
   formatClientsList
 } from '@/lib/telegram'
 import { getUserCompany } from '@/lib/company-utils'
-import { parseNaturalLanguage } from '@/lib/telegram-ai'
+import { parseNaturalLanguage, generateConversationalResponse } from '@/lib/telegram-ai'
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
@@ -220,45 +220,42 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] Text recibido:', text)
       console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error')
       
-      // Preparar mensaje según el comando
-      const command = text.toLowerCase().trim()
-      console.log('[TELEGRAM] Comando detectado:', command)
-      const isStart = command === '/start' || command === 'hola' || command === 'hi'
-      const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura') || text.toLowerCase().includes('crear') && text.toLowerCase().includes('factura')
-      const isCreateQuote = command === '/crear_cotizacion' || command.startsWith('/crear_cotizacion')
-      
+      // Usar agente conversacional de IA para generar respuesta
+      console.log('[TELEGRAM] Generando respuesta conversacional con IA...')
       let messageText = ''
       
-      if (isStart) {
-        messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
-          '⚠️ Hay un problema temporal con la base de datos.\n\n' +
-          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-          'Por favor, intenta de nuevo en unos segundos.\n\n' +
-          'Comandos disponibles:\n' +
-          '/crear_factura - Crear una factura\n' +
-          '/crear_cotizacion - Crear una cotización\n' +
-          '/clientes - Ver tus clientes\n' +
-          '/ayuda - Ver ayuda'
-      } else if (isCreateInvoice) {
-        messageText = '📝 Para crear una factura, necesito acceso a la base de datos.\n\n' +
-          '⚠️ Hay un problema temporal de conexión.\n\n' +
-          'Por favor, intenta de nuevo en unos segundos.\n\n' +
-          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-          'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
-      } else if (isCreateQuote) {
-        messageText = '📋 Para crear una cotización, necesito acceso a la base de datos.\n\n' +
-          '⚠️ Hay un problema temporal de conexión.\n\n' +
-          'Por favor, intenta de nuevo en unos segundos.\n\n' +
-          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-          'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
-      } else {
-        messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
-          'Por favor, intenta de nuevo en unos segundos.\n\n' +
-          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-          'Escribe /start para comenzar.'
+      try {
+        messageText = await generateConversationalResponse(text, {
+          telegramId,
+          isLinked: false,
+          hasDatabaseError: true
+        })
+        console.log('[TELEGRAM] ✅ Respuesta generada por IA:', messageText.substring(0, 100) + '...')
+      } catch (aiError: any) {
+        console.error('[TELEGRAM] Error generando respuesta con IA, usando fallback:', aiError?.message)
+        // Fallback básico si la IA falla
+        const command = text.toLowerCase().trim()
+        const isStart = command === '/start' || command === 'hola' || command === 'hi'
+        
+        if (isStart) {
+          messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+            '⚠️ Hay un problema temporal con la base de datos.\n\n' +
+            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            'Comandos disponibles:\n' +
+            '/crear_factura - Crear una factura\n' +
+            '/crear_cotizacion - Crear una cotización\n' +
+            '/clientes - Ver tus clientes\n' +
+            '/ayuda - Ver ayuda'
+        } else {
+          messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+            'Escribe /start para comenzar.'
+        }
       }
       
-      console.log('[TELEGRAM] Mensaje preparado:', messageText.substring(0, 100) + '...')
+      console.log('[TELEGRAM] Mensaje final preparado:', messageText.substring(0, 100) + '...')
       console.log('[TELEGRAM] Llamando a sendErrorMessage...')
       
       // Intentar enviar mensaje usando la función helper
@@ -300,64 +297,43 @@ async function processTelegramUpdate(update: any) {
     
     if (!telegramUser) {
       console.log('[TELEGRAM] Usuario no encontrado. TelegramId:', telegramId)
-      console.log('[TELEGRAM] Usuario no vinculado, enviando mensaje de bienvenida a chatId:', chatId)
+      console.log('[TELEGRAM] Usuario no vinculado, generando respuesta conversacional...')
       
-      // Usuario no vinculado - SIEMPRE enviar mensaje de bienvenida
-      // Si es /start, enviar mensaje de bienvenida más amigable
-      if (text.toLowerCase().trim() === '/start' || text.toLowerCase().trim() === 'hola' || text.toLowerCase().trim() === 'hi') {
-        try {
-          console.log('[TELEGRAM] Enviando mensaje de bienvenida para /start')
-          const welcomeMessage = await bot.sendMessage(
-            chatId,
-            '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
-            'Para usar el bot, primero necesitas vincular tu cuenta de Telegram con tu cuenta de Konsul Bills.\n\n' +
-            '📱 Pasos para vincular:\n' +
-            '1. Visita tu panel de configuración en la aplicación web\n' +
-            '2. Ve a la sección de Telegram\n' +
-            '3. Copia tu Telegram ID: `' + telegramId + '`\n' +
-            '4. Pega el ID y guarda la configuración\n\n' +
-            'Una vez vinculado, podrás usar comandos como:\n' +
-            '/crear_factura - Crear una factura\n' +
-            '/crear_cotizacion - Crear una cotización\n' +
-            '/clientes - Ver tus clientes\n\n' +
-            '¿Necesitas ayuda? Escribe /ayuda'
-          )
-          console.log('[TELEGRAM] ✅ Mensaje de bienvenida enviado exitosamente. Message ID:', welcomeMessage?.message_id)
-          return
-        } catch (sendError: any) {
-          console.error('[TELEGRAM] ❌ Error enviando mensaje de bienvenida:', sendError?.message || sendError)
-          console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
-          // Intentar enviar un mensaje más simple como fallback
-          try {
-            await bot.sendMessage(chatId, '👋 ¡Hola! Bienvenido. Tu Telegram ID es: ' + telegramId)
-          } catch (fallbackError) {
-            console.error('[TELEGRAM] ❌ Error en fallback también:', fallbackError)
-          }
-          return
-        }
-      } else {
-        // Para otros comandos, enviar mensaje de vinculación requerida
-        try {
-          console.log('[TELEGRAM] Enviando mensaje de vinculación requerida')
-          const linkMessage = await bot.sendMessage(
-            chatId,
-            '⚠️ No estás vinculado a una cuenta.\n\n' +
+      // Usar agente conversacional de IA para responder
+      try {
+        const aiResponse = await generateConversationalResponse(text, {
+          telegramId,
+          isLinked: false,
+          hasDatabaseError: false
+        })
+        
+        console.log('[TELEGRAM] ✅ Respuesta generada por IA para usuario no vinculado')
+        const response = await bot.sendMessage(chatId, aiResponse)
+        console.log('[TELEGRAM] ✅ Mensaje enviado exitosamente. Message ID:', response?.message_id)
+        return
+      } catch (aiError: any) {
+        console.error('[TELEGRAM] Error generando respuesta con IA, usando fallback:', aiError?.message)
+        
+        // Fallback básico
+        const isStart = text.toLowerCase().trim() === '/start' || text.toLowerCase().trim() === 'hola' || text.toLowerCase().trim() === 'hi'
+        const fallbackMessage = isStart
+          ? '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+            'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n\n' +
+            `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+            'Visita tu panel de configuración en la aplicación web para vincular tu cuenta.\n\n' +
+            'Escribe /ayuda para más información.'
+          : '⚠️ No estás vinculado a una cuenta.\n\n' +
             'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
             'Visita tu panel de configuración en la aplicación web.\n\n' +
             `Tu Telegram ID es: \`${telegramId}\`\n\n` +
             'Escribe /start para ver más información.'
-          )
-          console.log('[TELEGRAM] ✅ Mensaje de vinculación enviado exitosamente. Message ID:', linkMessage?.message_id)
+        
+        try {
+          const response = await bot.sendMessage(chatId, fallbackMessage)
+          console.log('[TELEGRAM] ✅ Mensaje fallback enviado. Message ID:', response?.message_id)
           return
         } catch (sendError: any) {
-          console.error('[TELEGRAM] ❌ Error enviando mensaje de vinculación:', sendError?.message || sendError)
-          console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
-          // Intentar enviar un mensaje más simple como fallback
-          try {
-            await bot.sendMessage(chatId, '⚠️ No estás vinculado. Tu Telegram ID: ' + telegramId + '. Escribe /start')
-          } catch (fallbackError) {
-            console.error('[TELEGRAM] ❌ Error en fallback también:', fallbackError)
-          }
+          console.error('[TELEGRAM] ❌ Error enviando mensaje fallback:', sendError?.message || sendError)
           return
         }
       }
@@ -614,13 +590,24 @@ async function handleNaturalLanguage(
       const clientsList = formatClientsList(clients)
       await bot.sendMessage(chatId, `📋 Tus clientes:\n\n${clientsList}`)
     } else {
-      await bot.sendMessage(
-        chatId,
-        '🤔 No entendí tu solicitud. Puedes:\n\n' +
-        '• Usar comandos: /crear_factura, /crear_cotizacion\n' +
-        '• Escribir en lenguaje natural: "Crea una cotización de 600 dólares para Omar Ortiz"\n' +
-        '• Usar /ayuda para más información'
-      )
+      // Si no entendió, usar agente conversacional para responder
+      try {
+        console.log('[TELEGRAM AI] Intent desconocido, usando agente conversacional')
+        const aiResponse = await generateConversationalResponse(text, {
+          isLinked: true,
+          hasDatabaseError: false
+        })
+        await bot.sendMessage(chatId, aiResponse)
+      } catch (aiError: any) {
+        console.error('[TELEGRAM AI] Error con agente conversacional, usando fallback:', aiError?.message)
+        await bot.sendMessage(
+          chatId,
+          '🤔 No entendí tu solicitud. Puedes:\n\n' +
+          '• Usar comandos: /crear_factura, /crear_cotizacion\n' +
+          '• Escribir en lenguaje natural: "Crea una cotización de 600 dólares para Omar Ortiz"\n' +
+          '• Usar /ayuda para más información'
+        )
+      }
     }
   } catch (error) {
     console.error('[TELEGRAM AI] Error procesando lenguaje natural:', error)

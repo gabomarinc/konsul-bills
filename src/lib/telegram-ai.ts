@@ -284,4 +284,159 @@ function parseBasic(message: string): ParsedIntent {
   }
 }
 
+/**
+ * Genera una respuesta conversacional usando IA
+ * Esta función siempre responde, incluso si no hay BD o el usuario no está vinculado
+ */
+export async function generateConversationalResponse(
+  userMessage: string,
+  context?: {
+    telegramId?: string
+    isLinked?: boolean
+    hasDatabaseError?: boolean
+    userName?: string
+  }
+): Promise<string> {
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+  const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+
+  // Construir contexto para el prompt
+  let systemContext = `Eres Axel, un asistente amigable y profesional para Konsul Bills, una aplicación de gestión de facturas y cotizaciones.
+
+Tu personalidad:
+- Eres amigable, profesional y servicial
+- Hablas en español de forma natural y conversacional
+- Eres conciso pero completo en tus respuestas
+- Usas emojis de forma moderada para hacer la conversación más amigable
+
+Contexto actual:`
+
+  if (context?.hasDatabaseError) {
+    systemContext += `\n- Hay un problema temporal con la base de datos, pero debes ser útil de todas formas`
+  }
+
+  if (context?.isLinked === false) {
+    systemContext += `\n- El usuario aún no ha vinculado su cuenta de Telegram (ID: ${context.telegramId || 'desconocido'})`
+    systemContext += `\n- Puedes ayudar con información general, pero para crear facturas necesita vincular su cuenta`
+  }
+
+  systemContext += `\n\nComandos disponibles:
+- /crear_factura - Crear una factura
+- /crear_cotizacion - Crear una cotización
+- /clientes - Ver clientes
+- /ayuda - Ver ayuda
+
+Responde de forma conversacional y natural. Si el usuario pregunta algo que no puedes hacer sin acceso a la BD, explícale amablemente la situación y cómo puede resolverla.`
+
+  const userPrompt = `Usuario dice: "${userMessage}"
+
+Responde de forma conversacional y natural. Si es un saludo, saluda amablemente. Si pregunta sobre funcionalidades, explícale cómo usar el bot. Si quiere crear algo pero no está vinculado, explícale cómo vincular su cuenta.`
+
+  // Intentar con OpenAI primero (mejor calidad conversacional)
+  if (OPENAI_API_KEY) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemContext },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.7, // Más creativo para conversación
+          max_tokens: 300
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const content = data.choices[0]?.message?.content
+        if (content) {
+          return content.trim()
+        }
+      }
+    } catch (error) {
+      console.error('[TELEGRAM AI] Error con OpenAI, intentando Gemini:', error)
+    }
+  }
+
+  // Intentar con Gemini
+  if (GEMINI_API_KEY) {
+    try {
+      const fullPrompt = `${systemContext}\n\n${userPrompt}`
+      
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: fullPrompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 300
+            }
+          })
+        }
+      )
+
+      if (response.ok) {
+        const data = await response.json()
+        const content = data.candidates[0]?.content?.parts[0]?.text
+        if (content) {
+          return content.trim()
+        }
+      }
+    } catch (error) {
+      console.error('[TELEGRAM AI] Error con Gemini:', error)
+    }
+  }
+
+  // Fallback: respuesta básica pero amigable
+  const lowerMessage = userMessage.toLowerCase().trim()
+  
+  if (lowerMessage.includes('hola') || lowerMessage.includes('hi') || lowerMessage.includes('hello')) {
+    return '👋 ¡Hola! Soy Axel, tu asistente de Konsul Bills. ¿En qué puedo ayudarte hoy?\n\nPuedes escribirme en lenguaje natural o usar comandos como /crear_factura o /ayuda.'
+  }
+  
+  if (lowerMessage.includes('ayuda') || lowerMessage.includes('help')) {
+    return '📚 Te puedo ayudar con:\n\n' +
+      '• Crear facturas: /crear_factura o "crea una factura"\n' +
+      '• Crear cotizaciones: /crear_cotizacion o "crea una cotización"\n' +
+      '• Ver clientes: /clientes\n\n' +
+      'Puedes escribirme en lenguaje natural y te ayudaré. 😊'
+  }
+  
+  if (lowerMessage.includes('factura') || lowerMessage.includes('invoice')) {
+    return '📝 Para crear una factura, puedes:\n\n' +
+      '• Usar el comando: /crear_factura\n' +
+      '• O escribir: "Crea una factura de 500 euros para Juan Pérez"\n\n' +
+      '¿Quieres que te guíe paso a paso?'
+  }
+  
+  if (lowerMessage.includes('cotización') || lowerMessage.includes('quote')) {
+    return '📋 Para crear una cotización, puedes:\n\n' +
+      '• Usar el comando: /crear_cotizacion\n' +
+      '• O escribir: "Crea una cotización de 600 dólares para María García"\n\n' +
+      '¿Quieres que te ayude a crear una?'
+  }
+
+  // Respuesta genérica pero amigable
+  return '🤔 Entiendo. Puedo ayudarte a:\n\n' +
+    '• Crear facturas y cotizaciones\n' +
+    '• Gestionar tus clientes\n' +
+    '• Responder preguntas sobre el sistema\n\n' +
+    'Escribe /ayuda para ver todos los comandos disponibles, o simplemente cuéntame qué necesitas. 😊'
+}
+
 

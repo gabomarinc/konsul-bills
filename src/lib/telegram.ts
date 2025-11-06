@@ -63,38 +63,68 @@ export function clearConversationState(telegramId: number) {
 
 /**
  * Obtiene el usuario de la base de datos vinculado a un Telegram ID
+ * Con manejo mejorado de errores para entornos serverless
  */
 export async function getTelegramUser(telegramId: string) {
-  try {
-    // Normalizar el telegramId (eliminar espacios, asegurar que sea string)
-    const normalizedId = String(telegramId).trim()
-    console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId)
-    
-    // Usar findUnique directamente (más eficiente y no agota el pool)
-    const result = await prisma.telegramUser.findUnique({
-      where: { telegramId: normalizedId },
-      include: {
-        User: {
+  let retries = 2
+  let lastError: any = null
+  
+  while (retries > 0) {
+    try {
+      // Normalizar el telegramId (eliminar espacios, asegurar que sea string)
+      const normalizedId = String(telegramId).trim()
+      console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId, `(intentos restantes: ${retries})`)
+      
+      // Usar findUnique directamente (más eficiente y no agota el pool)
+      const result = await Promise.race([
+        prisma.telegramUser.findUnique({
+          where: { telegramId: normalizedId },
           include: {
-            Membership: {
+            User: {
               include: {
-                Company: {
+                Membership: {
                   include: {
-                    CompanySettings: true
+                    Company: {
+                      include: {
+                        CompanySettings: true
+                      }
+                    }
                   }
                 }
               }
             }
           }
+        }),
+        // Timeout de 8 segundos (menos que el timeout del pool)
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout')), 8000)
+        )
+      ]) as any
+      
+      console.log('[TELEGRAM DB] Resultado de búsqueda:', result ? `Usuario encontrado: ${result.id}` : 'No encontrado')
+      return result
+    } catch (error: any) {
+      lastError = error
+      console.error(`[TELEGRAM DB] Error en getTelegramUser (intento ${3 - retries}):`, error?.code || error?.message)
+      
+      // Si es un error de pool, esperar un poco antes de reintentar
+      if (error?.code === 'P2024' || error?.message?.includes('connection pool')) {
+        retries--
+        if (retries > 0) {
+          console.log('[TELEGRAM DB] Reintentando después de error de pool...')
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Esperar 1 segundo
+          continue
         }
+      } else {
+        // Para otros errores, no reintentar
+        break
       }
-    })
-    console.log('[TELEGRAM DB] Resultado de búsqueda:', result ? `Usuario encontrado: ${result.id}` : 'No encontrado')
-    return result
-  } catch (error) {
-    console.error('[TELEGRAM DB] Error en getTelegramUser:', error)
-    throw error
+    }
   }
+  
+  // Si llegamos aquí, todos los intentos fallaron
+  console.error('[TELEGRAM DB] Todos los intentos fallaron:', lastError)
+  throw lastError || new Error('Failed to get Telegram user after retries')
 }
 
 /**

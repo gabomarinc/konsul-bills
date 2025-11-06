@@ -26,6 +26,7 @@ type TelegramBot = {
 // Función para obtener el bot (solo se inicializa cuando se necesita)
 function getBot(): TelegramBot | null {
   if (!TELEGRAM_BOT_TOKEN) {
+    console.error('[TELEGRAM] TELEGRAM_BOT_TOKEN no configurado')
     return null
   }
 
@@ -36,10 +37,11 @@ function getBot(): TelegramBot | null {
     // Intentar con default primero, luego sin default
     const BotConstructor = TelegramBotClass.default || TelegramBotClass
     const bot = new BotConstructor(TELEGRAM_BOT_TOKEN, { polling: false }) as TelegramBot
-    console.log('[TELEGRAM] Bot inicializado correctamente')
+    console.log('[TELEGRAM] Bot inicializado correctamente con token:', TELEGRAM_BOT_TOKEN.substring(0, 10) + '...')
     return bot
   } catch (error) {
     console.error('[TELEGRAM] Error inicializando bot:', error)
+    console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
     return null
   }
 }
@@ -79,14 +81,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Procesar el update de forma asíncrona (no esperar respuesta)
+    // IMPORTANTE: No usar await aquí para responder rápido a Telegram
     processTelegramUpdate(update).catch((error) => {
       console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
       console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
-    }).then(() => {
-      console.log('[TELEGRAM WEBHOOK] Procesamiento completado')
     })
 
-    // Responder inmediatamente a Telegram (requerido)
+    // Responder inmediatamente a Telegram (requerido por la API de Telegram)
+    // El procesamiento continúa en background
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[TELEGRAM WEBHOOK] Error en webhook:', error)
@@ -129,39 +131,115 @@ async function processTelegramUpdate(update: any) {
       if (telegramUser) {
         console.log('[TELEGRAM] Usuario encontrado - ID:', telegramUser.id, 'UserId:', telegramUser.userId)
       }
-    } catch (error) {
-      console.error('[TELEGRAM] Error buscando usuario:', error)
+    } catch (error: any) {
+      console.error('[TELEGRAM] Error buscando usuario:', error?.code || error?.message)
       console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
+      
+      // Si es un error de conexión a la base de datos, tratar como usuario no vinculado
+      // y enviar mensaje de bienvenida
+      if (error?.code === 'P2024' || error?.message?.includes('connection pool') || error?.message?.includes('timeout')) {
+        console.log('[TELEGRAM] ⚠️ Error de conexión a BD (P2024), tratando como usuario no vinculado')
+        console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error de BD')
+        
+        // Intentar enviar mensaje de bienvenida incluso si falló la BD
+        try {
+          const isStart = text.toLowerCase().trim() === '/start' || text.toLowerCase().trim() === 'hola' || text.toLowerCase().trim() === 'hi'
+          const messageText = isStart
+            ? '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+              '⚠️ Hay un problema temporal con la base de datos.\n\n' +
+              'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+              'Por favor, intenta de nuevo en unos segundos.\n\n' +
+              'Comandos disponibles:\n' +
+              '/crear_factura - Crear una factura\n' +
+              '/crear_cotizacion - Crear una cotización\n' +
+              '/clientes - Ver tus clientes\n' +
+              '/ayuda - Ver ayuda'
+            : '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+              'Por favor, intenta de nuevo en unos segundos.\n\n' +
+              'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+              'Escribe /start para comenzar.'
+          
+          const errorMessage = await bot.sendMessage(chatId, messageText)
+          console.log('[TELEGRAM] ✅ Mensaje enviado a pesar del error de BD. Message ID:', errorMessage?.message_id)
+        } catch (sendError: any) {
+          console.error('[TELEGRAM] ❌ Error enviando mensaje después de error de BD:', sendError?.message || sendError)
+          // Último intento con mensaje muy simple
+          try {
+            await bot.sendMessage(chatId, '👋 Hola! Tu ID: ' + telegramId + '. Error temporal, intenta más tarde.')
+          } catch (finalError) {
+            console.error('[TELEGRAM] ❌ Error crítico enviando mensaje:', finalError)
+          }
+        }
+        return // Salir sin lanzar el error para que el webhook responda 200
+      }
+      
+      // Para otros errores, lanzar el error normalmente
       throw error
     }
     
     if (!telegramUser) {
       console.log('[TELEGRAM] Usuario no encontrado. TelegramId:', telegramId)
-      console.log('[TELEGRAM] Intentando buscar en la base de datos...')
+      console.log('[TELEGRAM] Usuario no vinculado, enviando mensaje de bienvenida a chatId:', chatId)
       
-      // Intentar buscar directamente en la base de datos para debug
-      const { prisma } = await import('@/lib/prisma')
-      const allTelegramUsers = await prisma.telegramUser.findMany({
-        take: 5
-      })
-      console.log('[TELEGRAM] Usuarios en DB:', allTelegramUsers.map(u => ({ id: u.id, telegramId: u.telegramId, userId: u.userId })))
-      
-      // Usuario no vinculado - requerir vinculación
-      console.log('[TELEGRAM] Intentando enviar mensaje de usuario no vinculado a chatId:', chatId)
-      try {
-        const messageResult = await bot.sendMessage(
-          chatId,
-          '⚠️ No estás vinculado a una cuenta.\n\n' +
-          'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
-          'Visita tu panel de configuración en la aplicación web.\n\n' +
-          `Tu Telegram ID es: ${telegramId}`
-        )
-        console.log('[TELEGRAM] Mensaje enviado exitosamente:', messageResult)
-      } catch (sendError) {
-        console.error('[TELEGRAM] Error enviando mensaje:', sendError)
-        console.error('[TELEGRAM] Error details:', sendError instanceof Error ? sendError.message : 'Unknown error')
+      // Usuario no vinculado - SIEMPRE enviar mensaje de bienvenida
+      // Si es /start, enviar mensaje de bienvenida más amigable
+      if (text.toLowerCase().trim() === '/start' || text.toLowerCase().trim() === 'hola' || text.toLowerCase().trim() === 'hi') {
+        try {
+          console.log('[TELEGRAM] Enviando mensaje de bienvenida para /start')
+          const welcomeMessage = await bot.sendMessage(
+            chatId,
+            '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+            'Para usar el bot, primero necesitas vincular tu cuenta de Telegram con tu cuenta de Konsul Bills.\n\n' +
+            '📱 Pasos para vincular:\n' +
+            '1. Visita tu panel de configuración en la aplicación web\n' +
+            '2. Ve a la sección de Telegram\n' +
+            '3. Copia tu Telegram ID: `' + telegramId + '`\n' +
+            '4. Pega el ID y guarda la configuración\n\n' +
+            'Una vez vinculado, podrás usar comandos como:\n' +
+            '/crear_factura - Crear una factura\n' +
+            '/crear_cotizacion - Crear una cotización\n' +
+            '/clientes - Ver tus clientes\n\n' +
+            '¿Necesitas ayuda? Escribe /ayuda'
+          )
+          console.log('[TELEGRAM] ✅ Mensaje de bienvenida enviado exitosamente. Message ID:', welcomeMessage?.message_id)
+          return
+        } catch (sendError: any) {
+          console.error('[TELEGRAM] ❌ Error enviando mensaje de bienvenida:', sendError?.message || sendError)
+          console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
+          // Intentar enviar un mensaje más simple como fallback
+          try {
+            await bot.sendMessage(chatId, '👋 ¡Hola! Bienvenido. Tu Telegram ID es: ' + telegramId)
+          } catch (fallbackError) {
+            console.error('[TELEGRAM] ❌ Error en fallback también:', fallbackError)
+          }
+          return
+        }
+      } else {
+        // Para otros comandos, enviar mensaje de vinculación requerida
+        try {
+          console.log('[TELEGRAM] Enviando mensaje de vinculación requerida')
+          const linkMessage = await bot.sendMessage(
+            chatId,
+            '⚠️ No estás vinculado a una cuenta.\n\n' +
+            'Para usar el bot, primero necesitas vincular tu cuenta de Telegram.\n' +
+            'Visita tu panel de configuración en la aplicación web.\n\n' +
+            `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+            'Escribe /start para ver más información.'
+          )
+          console.log('[TELEGRAM] ✅ Mensaje de vinculación enviado exitosamente. Message ID:', linkMessage?.message_id)
+          return
+        } catch (sendError: any) {
+          console.error('[TELEGRAM] ❌ Error enviando mensaje de vinculación:', sendError?.message || sendError)
+          console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
+          // Intentar enviar un mensaje más simple como fallback
+          try {
+            await bot.sendMessage(chatId, '⚠️ No estás vinculado. Tu Telegram ID: ' + telegramId + '. Escribe /start')
+          } catch (fallbackError) {
+            console.error('[TELEGRAM] ❌ Error en fallback también:', fallbackError)
+          }
+          return
+        }
       }
-      return
     }
 
     const user = telegramUser.User
@@ -187,31 +265,45 @@ async function processTelegramUpdate(update: any) {
     if (text.startsWith('/')) {
       console.log('[TELEGRAM] Es un comando, llamando handleCommand')
       await handleCommand(chatId, text, conversation, company.id)
+      console.log('[TELEGRAM] handleCommand completado')
     } else {
       // Verificar si hay un estado de conversación activo
       if (conversation.state !== 'idle') {
         console.log('[TELEGRAM] No es comando, llamando handleConversation (estado activo)')
         // Procesar respuesta según el estado de conversación
         await handleConversation(chatId, text, conversation, company.id)
+        console.log('[TELEGRAM] handleConversation completado')
       } else {
         // Estado idle: intentar procesar como lenguaje natural con IA
         console.log('[TELEGRAM] Estado idle, intentando procesar con IA')
         await handleNaturalLanguage(chatId, text, conversation, company.id)
+        console.log('[TELEGRAM] handleNaturalLanguage completado')
       }
     }
+    
+    console.log('[TELEGRAM] Procesamiento de mensaje completado exitosamente')
   } catch (error) {
-    console.error('Error procesando mensaje:', error)
+    console.error('[TELEGRAM] Error procesando mensaje:', error)
+    console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
+    
     const bot = getBot()
     if (bot) {
       try {
-        await bot.sendMessage(
+        console.log('[TELEGRAM] Intentando enviar mensaje de error a chatId:', chatId)
+        const errorMessage = await bot.sendMessage(
           chatId,
           '❌ Ocurrió un error al procesar tu mensaje. Por favor, intenta de nuevo.\n\n' +
-          `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`
+          `Error: ${error instanceof Error ? error.message : 'Error desconocido'}\n\n` +
+          'Si el problema persiste, escribe /ayuda para obtener ayuda.'
         )
+        console.log('[TELEGRAM] Mensaje de error enviado exitosamente:', errorMessage?.message_id)
       } catch (sendError) {
-        console.error('Error enviando mensaje de error:', sendError)
+        console.error('[TELEGRAM] Error enviando mensaje de error:', sendError)
+        console.error('[TELEGRAM] Error details:', sendError instanceof Error ? sendError.message : 'Unknown error')
+        console.error('[TELEGRAM] Error stack:', sendError instanceof Error ? sendError.stack : 'No stack')
       }
+    } else {
+      console.error('[TELEGRAM] Bot no disponible para enviar mensaje de error')
     }
   }
 }
@@ -237,35 +329,49 @@ async function handleCommand(
   try {
     switch (cmd) {
     case '/start':
-      console.log('[TELEGRAM] Enviando mensaje de /start')
-      const startResult = await bot.sendMessage(
-        chatId,
-        '👋 ¡Hola! Soy tu asistente de Konsul Bills.\n\n' +
-        'Comandos disponibles:\n' +
-        '/crear_factura - Crear una nueva factura\n' +
-        '/crear_cotizacion - Crear una nueva cotización\n' +
-        '/clientes - Listar todos los clientes\n' +
-        '/cancelar - Cancelar operación en curso\n' +
-        '/ayuda - Mostrar esta ayuda'
-      )
-      console.log('[TELEGRAM] Mensaje /start enviado:', startResult?.message_id)
-      clearConversationState(chatId)
+      console.log('[TELEGRAM] Procesando comando /start para chatId:', chatId)
+      try {
+        const startResult = await bot.sendMessage(
+          chatId,
+          '👋 ¡Hola! Soy tu asistente de Konsul Bills.\n\n' +
+          'Comandos disponibles:\n' +
+          '/crear_factura - Crear una nueva factura\n' +
+          '/crear_cotizacion - Crear una nueva cotización\n' +
+          '/clientes - Listar todos los clientes\n' +
+          '/cancelar - Cancelar operación en curso\n' +
+          '/ayuda - Mostrar esta ayuda\n\n' +
+          '¿En qué puedo ayudarte hoy?'
+        )
+        console.log('[TELEGRAM] Mensaje /start enviado exitosamente. Message ID:', startResult?.message_id)
+        clearConversationState(chatId)
+      } catch (error) {
+        console.error('[TELEGRAM] Error enviando mensaje /start:', error)
+        console.error('[TELEGRAM] Error details:', error instanceof Error ? error.message : 'Unknown error')
+        throw error // Re-lanzar para que se maneje en el catch general
+      }
       break
 
     case '/crear_factura':
-      console.log('[TELEGRAM] Procesando /crear_factura')
-      setConversationState(chatId, {
-        state: 'creating_invoice_client',
-        draft: { type: 'invoice', items: [] }
-      })
-      console.log('[TELEGRAM] Enviando mensaje de pregunta sobre cliente')
-      const invoiceResult = await bot.sendMessage(
-        chatId,
-        '📝 Creando nueva factura...\n\n' +
-        '¿Cuál es el nombre del cliente?\n' +
-        '(Puedes escribir el nombre completo o buscar entre tus clientes)'
-      )
-      console.log('[TELEGRAM] Mensaje de /crear_factura enviado:', invoiceResult?.message_id)
+      console.log('[TELEGRAM] Procesando comando /crear_factura para chatId:', chatId)
+      try {
+        setConversationState(chatId, {
+          state: 'creating_invoice_client',
+          draft: { type: 'invoice', items: [] }
+        })
+        console.log('[TELEGRAM] Estado de conversación actualizado')
+        
+        const invoiceResult = await bot.sendMessage(
+          chatId,
+          '📝 Creando nueva factura...\n\n' +
+          '¿Cuál es el nombre del cliente?\n' +
+          '(Puedes escribir el nombre completo o buscar entre tus clientes)'
+        )
+        console.log('[TELEGRAM] Mensaje de /crear_factura enviado exitosamente. Message ID:', invoiceResult?.message_id)
+      } catch (error) {
+        console.error('[TELEGRAM] Error procesando /crear_factura:', error)
+        console.error('[TELEGRAM] Error details:', error instanceof Error ? error.message : 'Unknown error')
+        throw error
+      }
       break
 
     case '/crear_cotizacion':

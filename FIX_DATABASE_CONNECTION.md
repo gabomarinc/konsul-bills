@@ -106,3 +106,4 @@ Después de configurar las variables:
 
 3. **Revisa los logs completos en Vercel** para ver el error exacto
 
+

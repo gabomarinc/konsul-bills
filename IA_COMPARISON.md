@@ -101,3 +101,4 @@ Para un uso típico (10-50 conversaciones por día):
 
 **Conclusión:** Ambos son muy económicos para uso personal/pequeño. Gemini es mejor para empezar sin compromiso.
 
+

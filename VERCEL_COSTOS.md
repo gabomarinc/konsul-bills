@@ -110,3 +110,4 @@ Vercel te notificará cuando te acerques a los límites:
 
 **No te preocupes por los costos ahora** - el plan gratuito es muy generoso y suficiente para desarrollo y proyectos pequeños/medianos.
 
+

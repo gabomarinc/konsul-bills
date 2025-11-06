@@ -93,3 +93,4 @@ Si ves el error "Error al vincular usuario de Telegram" después de ejecutar la 
 2. Verifica los logs del servidor en Vercel para ver el error específico
 3. Asegúrate de que las variables de entorno DATABASE_URL y DIRECT_URL estén configuradas correctamente
 
+

@@ -76,3 +76,4 @@ Si prefieres usar OpenAI en lugar de Gemini:
 
 **Nota:** El código intenta usar OpenAI primero, luego Gemini, y si no hay ninguno, usa parseo básico.
 
+

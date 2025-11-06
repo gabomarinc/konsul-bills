@@ -160,3 +160,4 @@ El bot **verifica automáticamente** si un cliente ya existe antes de crear uno 
 - [ ] Agregar notificaciones cuando se crean facturas desde la web
 - [ ] Permitir editar facturas/cotizaciones desde Telegram
 
+

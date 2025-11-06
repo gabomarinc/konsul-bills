@@ -170,7 +170,9 @@ async function processTelegramUpdate(update: any) {
         console.log('[TELEGRAM] Usuario encontrado - ID:', telegramUser.id, 'UserId:', telegramUser.userId)
       }
     } catch (error: any) {
+      console.error('[TELEGRAM] ❌❌❌ ERROR CAPTURADO EN CATCH ❌❌❌')
       console.error('[TELEGRAM] Error buscando usuario:', error?.code || error?.message)
+      console.error('[TELEGRAM] Error name:', error?.name)
       console.error('[TELEGRAM] Error completo:', JSON.stringify({
         code: error?.code,
         message: error?.message,
@@ -180,6 +182,7 @@ async function processTelegramUpdate(update: any) {
       
       // CUALQUIER error al buscar usuario = tratar como usuario no vinculado y enviar mensaje
       // Esto asegura que el bot SIEMPRE responda
+      console.log('[TELEGRAM] ⚠️⚠️⚠️ INICIANDO ENVÍO DE MENSAJE ⚠️⚠️⚠️')
       console.log('[TELEGRAM] ⚠️ Error al buscar usuario, tratando como usuario no vinculado')
       console.log('[TELEGRAM] Bot disponible?', bot ? 'Sí' : 'No')
       console.log('[TELEGRAM] ChatId:', chatId, 'TelegramId:', telegramId)
@@ -228,9 +231,39 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] Llamando a sendErrorMessage...')
       
       // Intentar enviar mensaje usando la función helper
-      const sendResult = await sendErrorMessage(messageText)
-      console.log('[TELEGRAM] Resultado de sendErrorMessage:', sendResult ? 'Éxito' : 'Falló')
+      try {
+        console.log('[TELEGRAM] 🔵 ANTES de await sendErrorMessage')
+        const sendResult = await sendErrorMessage(messageText)
+        console.log('[TELEGRAM] 🟢 DESPUÉS de await sendErrorMessage')
+        console.log('[TELEGRAM] Resultado de sendErrorMessage:', sendResult ? 'Éxito' : 'Falló')
+        
+        if (!sendResult) {
+          console.error('[TELEGRAM] ⚠️ sendErrorMessage retornó null, intentando envío directo...')
+          // Último intento directo
+          if (bot) {
+            try {
+              const directResult = await bot.sendMessage(chatId, messageText)
+              console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO DIRECTAMENTE. Message ID:', directResult?.message_id)
+            } catch (directErr: any) {
+              console.error('[TELEGRAM] ❌❌❌ ERROR EN ENVÍO DIRECTO:', directErr?.message || directErr)
+            }
+          }
+        }
+      } catch (sendErr: any) {
+        console.error('[TELEGRAM] ❌❌❌ ERROR EN sendErrorMessage:', sendErr?.message || sendErr)
+        // Último intento directo
+        if (bot) {
+          try {
+            console.log('[TELEGRAM] 🔴 Intentando envío directo como último recurso...')
+            const directResult = await bot.sendMessage(chatId, messageText)
+            console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO DIRECTAMENTE (fallback). Message ID:', directResult?.message_id)
+          } catch (finalErr: any) {
+            console.error('[TELEGRAM] ❌❌❌ ERROR CRÍTICO - NO SE PUDO ENVIAR MENSAJE:', finalErr?.message || finalErr)
+          }
+        }
+      }
       
+      console.log('[TELEGRAM] 🏁 FINALIZANDO CATCH - Retornando...')
       return // Salir sin lanzar el error para que el webhook responda 200
     }
     

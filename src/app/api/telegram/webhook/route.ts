@@ -201,13 +201,31 @@ async function processTelegramUpdate(update: any) {
     }
   }
 
-  // Timeout global para asegurar que SIEMPRE respondamos
+  // Timeout global MUY corto para asegurar que SIEMPRE respondamos rápido
   const timeoutPromise = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Global timeout - forzando respuesta')), 8000)
+    setTimeout(() => reject(new Error('Global timeout - forzando respuesta')), 2000) // 2 segundos máximo
   )
 
+  // Función para enviar respuesta inmediata (sin esperar BD)
+  const sendImmediateResponse = async (message: string) => {
+    try {
+      console.log('[TELEGRAM] 🚀 ENVIANDO RESPUESTA INMEDIATA:', message.substring(0, 50) + '...')
+      const result = await Promise.race([
+        bot.sendMessage(chatId, message),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout enviando mensaje')), 5000)
+        )
+      ]) as any
+      console.log('[TELEGRAM] ✅✅✅ RESPUESTA ENVIADA EXITOSAMENTE. Message ID:', result?.message_id)
+      return result
+    } catch (err: any) {
+      console.error('[TELEGRAM] ❌ Error enviando respuesta inmediata:', err?.message)
+      return null
+    }
+  }
+
   try {
-    // Obtener o vincular usuario de Telegram con timeout global
+    // Obtener o vincular usuario de Telegram con timeout global MUY corto
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
     let telegramUser
     try {
@@ -244,74 +262,49 @@ async function processTelegramUpdate(update: any) {
       console.log('[TELEGRAM] Text recibido:', text)
       console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error')
       
-      // Usar agente conversacional de IA para generar respuesta
-      console.log('[TELEGRAM] Generando respuesta conversacional con IA...')
-      let messageText = ''
+      // ENVIAR RESPUESTA INMEDIATAMENTE - No esperar a generar con IA si hay error de BD
+      console.log('[TELEGRAM] 🚀 ENVIANDO RESPUESTA INMEDIATA (sin esperar IA)...')
       
-      try {
-        messageText = await generateConversationalResponse(text, {
-          telegramId,
-          isLinked: false,
-          hasDatabaseError: true
-        })
-        console.log('[TELEGRAM] ✅ Respuesta generada por IA:', messageText.substring(0, 100) + '...')
-      } catch (aiError: any) {
-        console.error('[TELEGRAM] Error generando respuesta con IA, usando fallback:', aiError?.message)
-        // Fallback básico si la IA falla
-        const command = text.toLowerCase().trim()
-        const isStart = command === '/start' || command === 'hola' || command === 'hi'
-        
-        if (isStart) {
-          messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
-            '⚠️ Hay un problema temporal con la base de datos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Comandos disponibles:\n' +
-            '/crear_factura - Crear una factura\n' +
-            '/crear_cotizacion - Crear una cotización\n' +
-            '/clientes - Ver tus clientes\n' +
-            '/ayuda - Ver ayuda'
-        } else {
-          messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-            'Escribe /start para comenzar.'
-        }
+      // Mensaje básico inmediato
+      const command = text.toLowerCase().trim()
+      const isStart = command === '/start' || command === 'hola' || command === 'hi' || text.toLowerCase().includes('hola')
+      
+      let immediateMessage = ''
+      if (isStart) {
+        immediateMessage = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+          '⚠️ Hay un problema temporal con la base de datos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Comandos disponibles:\n' +
+          '/crear_factura - Crear una factura\n' +
+          '/crear_cotizacion - Crear una cotización\n' +
+          '/clientes - Ver tus clientes\n' +
+          '/ayuda - Ver ayuda'
+      } else {
+        immediateMessage = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+          'Por favor, intenta de nuevo en unos segundos.\n\n' +
+          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+          'Escribe /start para comenzar.'
       }
       
-      console.log('[TELEGRAM] Mensaje final preparado:', messageText.substring(0, 100) + '...')
-      console.log('[TELEGRAM] Llamando a sendErrorMessage...')
+      // ENVIAR INMEDIATAMENTE
+      const sendResult = await sendImmediateResponse(immediateMessage)
       
-      // Intentar enviar mensaje usando la función helper
-      try {
-        console.log('[TELEGRAM] 🔵 ANTES de await sendErrorMessage')
-        const sendResult = await sendErrorMessage(messageText)
-        console.log('[TELEGRAM] 🟢 DESPUÉS de await sendErrorMessage')
-        console.log('[TELEGRAM] Resultado de sendErrorMessage:', sendResult ? 'Éxito' : 'Falló')
+      if (sendResult) {
+        console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO EXITOSAMENTE')
+      } else {
+        console.error('[TELEGRAM] ❌ FALLO ENVÍO INMEDIATO, intentando con IA...')
         
-        if (!sendResult) {
-          console.error('[TELEGRAM] ⚠️ sendErrorMessage retornó null, intentando envío directo...')
-          // Último intento directo
-          if (bot) {
-            try {
-              const directResult = await bot.sendMessage(chatId, messageText)
-              console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO DIRECTAMENTE. Message ID:', directResult?.message_id)
-            } catch (directErr: any) {
-              console.error('[TELEGRAM] ❌❌❌ ERROR EN ENVÍO DIRECTO:', directErr?.message || directErr)
-            }
-          }
-        }
-      } catch (sendErr: any) {
-        console.error('[TELEGRAM] ❌❌❌ ERROR EN sendErrorMessage:', sendErr?.message || sendErr)
-        // Último intento directo
-        if (bot) {
-          try {
-            console.log('[TELEGRAM] 🔴 Intentando envío directo como último recurso...')
-            const directResult = await bot.sendMessage(chatId, messageText)
-            console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO DIRECTAMENTE (fallback). Message ID:', directResult?.message_id)
-          } catch (finalErr: any) {
-            console.error('[TELEGRAM] ❌❌❌ ERROR CRÍTICO - NO SE PUDO ENVIAR MENSAJE:', finalErr?.message || finalErr)
-          }
+        // Si falla el envío inmediato, intentar con IA en background
+        try {
+          const aiMessage = await generateConversationalResponse(text, {
+            telegramId,
+            isLinked: false,
+            hasDatabaseError: true
+          })
+          await sendImmediateResponse(aiMessage)
+        } catch (aiErr) {
+          console.error('[TELEGRAM] Error con IA también:', aiErr)
         }
       }
       

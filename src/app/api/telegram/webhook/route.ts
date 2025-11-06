@@ -23,11 +23,20 @@ type TelegramBot = {
   [key: string]: any;
 }
 
-// Función para obtener el bot (solo se inicializa cuando se necesita)
+// Singleton para el bot (evitar múltiples inicializaciones)
+let botInstance: TelegramBot | null = null
+
+// Función para obtener el bot (solo se inicializa una vez)
 function getBot(): TelegramBot | null {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error('[TELEGRAM] TELEGRAM_BOT_TOKEN no configurado')
     return null
+  }
+
+  // Si ya existe una instancia, reutilizarla
+  if (botInstance) {
+    console.log('[TELEGRAM] Reutilizando instancia existente del bot')
+    return botInstance
   }
 
   // Inicializar dinámicamente para evitar problemas en build
@@ -36,9 +45,18 @@ function getBot(): TelegramBot | null {
     const TelegramBotClass = require('node-telegram-bot-api')
     // Intentar con default primero, luego sin default
     const BotConstructor = TelegramBotClass.default || TelegramBotClass
-    const bot = new BotConstructor(TELEGRAM_BOT_TOKEN, { polling: false }) as TelegramBot
+    botInstance = new BotConstructor(TELEGRAM_BOT_TOKEN, { 
+      polling: false,
+      // Opciones adicionales para mejorar la conexión
+      request: {
+        agentOptions: {
+          keepAlive: true,
+          keepAliveMsecs: 10000
+        }
+      }
+    }) as TelegramBot
     console.log('[TELEGRAM] Bot inicializado correctamente con token:', TELEGRAM_BOT_TOKEN.substring(0, 10) + '...')
-    return bot
+    return botInstance
   } catch (error) {
     console.error('[TELEGRAM] Error inicializando bot:', error)
     console.error('[TELEGRAM] Error stack:', error instanceof Error ? error.stack : 'No stack')
@@ -142,19 +160,32 @@ async function processTelegramUpdate(update: any) {
 
   console.log('[TELEGRAM] Procesando mensaje:', { chatId, telegramId, text, updateId: update.update_id })
 
-  // Función helper para enviar mensaje de error
+  // Función helper para enviar mensaje de error con timeout
   const sendErrorMessage = async (errorMsg: string) => {
     if (!bot) {
       console.error('[TELEGRAM] ❌ Bot no disponible para enviar mensaje de error')
-      return
+      return null
     }
     try {
       console.log('[TELEGRAM] Enviando mensaje de error a chatId:', chatId)
-      const result = await bot.sendMessage(chatId, errorMsg)
+      console.log('[TELEGRAM] Token disponible?', TELEGRAM_BOT_TOKEN ? 'Sí' : 'No')
+      console.log('[TELEGRAM] Token preview:', TELEGRAM_BOT_TOKEN?.substring(0, 10) + '...')
+      
+      // Usar Promise.race para agregar timeout de 5 segundos
+      const result = await Promise.race([
+        bot.sendMessage(chatId, errorMsg),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout enviando mensaje a Telegram')), 5000)
+        )
+      ]) as any
+      
       console.log('[TELEGRAM] ✅ Mensaje de error enviado. Message ID:', result?.message_id)
+      console.log('[TELEGRAM] ✅ Respuesta completa de Telegram:', JSON.stringify(result))
       return result
     } catch (sendErr: any) {
       console.error('[TELEGRAM] ❌ Error enviando mensaje de error:', sendErr?.message || sendErr)
+      console.error('[TELEGRAM] ❌ Error code:', sendErr?.code)
+      console.error('[TELEGRAM] ❌ Error response:', sendErr?.response ? JSON.stringify(sendErr.response) : 'No response')
       return null
     }
   }

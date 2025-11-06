@@ -195,12 +195,15 @@ async function processTelegramUpdate(update: any) {
     console.log('[TELEGRAM] Buscando usuario con telegramId:', telegramId)
     let telegramUser
     try {
+      console.log('[TELEGRAM] 🔵 ANTES de getTelegramUser')
       telegramUser = await getTelegramUser(telegramId)
+      console.log('[TELEGRAM] 🟢 DESPUÉS de getTelegramUser')
       console.log('[TELEGRAM] Usuario encontrado:', telegramUser ? 'Sí' : 'No')
       if (telegramUser) {
         console.log('[TELEGRAM] Usuario encontrado - ID:', telegramUser.id, 'UserId:', telegramUser.userId)
       }
     } catch (error: any) {
+      console.log('[TELEGRAM] 🔴 ENTRANDO AL CATCH INTERNO')
       console.error('[TELEGRAM] ❌❌❌ ERROR CAPTURADO EN CATCH ❌❌❌')
       console.error('[TELEGRAM] Error buscando usuario:', error?.code || error?.message)
       console.error('[TELEGRAM] Error name:', error?.name)

@@ -127,13 +127,18 @@ export async function getTelegramUser(telegramId: string) {
   }
   
   // Si llegamos aquí, todos los intentos fallaron
-  console.error('[TELEGRAM DB] Todos los intentos fallaron:', lastError)
+  console.error('[TELEGRAM DB] ❌❌❌ Todos los intentos fallaron ❌❌❌')
+  console.error('[TELEGRAM DB] Último error:', lastError?.message || lastError)
+  console.error('[TELEGRAM DB] Lanzando error final...')
+  
   // Asegurar que el error tenga el mensaje correcto para que sea capturado
   const finalError = lastError || new Error('Failed to get Telegram user after retries')
   if (finalError instanceof Error && !finalError.message.includes('timeout') && !finalError.message.includes('Database query')) {
     // Si el error no tiene "timeout" en el mensaje, agregarlo para que sea capturado
     finalError.message = `Database query timeout: ${finalError.message}`
   }
+  
+  console.error('[TELEGRAM DB] Error final a lanzar:', finalError.message)
   throw finalError
 }
 

@@ -15,6 +15,24 @@ import {
 import { getUserCompany } from '@/lib/company-utils'
 import { parseNaturalLanguage, generateConversationalResponse } from '@/lib/telegram-ai'
 
+// Helper para mantener promesas vivas en Vercel
+function keepAlive(promise: Promise<any>) {
+  // En Vercel, necesitamos mantener la referencia a la promesa
+  // para que no se recolecte como basura antes de completarse
+  if (typeof globalThis !== 'undefined') {
+    (globalThis as any).__telegramPromises = (globalThis as any).__telegramPromises || []
+    ;(globalThis as any).__telegramPromises.push(promise)
+    promise.finally(() => {
+      const promises = (globalThis as any).__telegramPromises
+      if (promises) {
+        const index = promises.indexOf(promise)
+        if (index > -1) promises.splice(index, 1)
+      }
+    })
+  }
+  return promise
+}
+
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
 // Tipo para el bot (sin importar el módulo)
@@ -98,10 +116,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Procesar el update de forma asíncrona (no esperar respuesta)
-    // IMPORTANTE: No usar await aquí para responder rápido a Telegram
-    // PERO asegurarnos de que el mensaje se envíe usando un wrapper que no se detenga
-    const processPromise = processTelegramUpdate(update).catch(async (error) => {
+    // CRÍTICO: En Vercel, las funciones pueden terminar antes de que se completen
+    // las operaciones asíncronas. Usamos keepAlive para mantener la promesa viva.
+    
+    // Procesar el update
+    const processPromise = keepAlive(processTelegramUpdate(update).catch(async (error) => {
       console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
       console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
       
@@ -113,32 +132,23 @@ export async function POST(req: NextRequest) {
         
         if (bot && chatId) {
           console.log('[TELEGRAM WEBHOOK] Intentando enviar mensaje de error desde catch principal')
-          // Usar Promise.race con timeout para asegurar que se complete
-          await Promise.race([
-            bot.sendMessage(
-              chatId,
-              '⚠️ Error al procesar tu mensaje.\n\n' +
-              'Por favor, intenta de nuevo en unos segundos.\n\n' +
-              `Tu Telegram ID es: \`${telegramId}\`\n\n` +
-              'Escribe /start para comenzar.'
-            ),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout en catch principal')), 10000)
-            )
-          ])
-          console.log('[TELEGRAM WEBHOOK] ✅ Mensaje de error enviado desde catch principal')
+          // Enviar directamente sin Promise.race para que sea más rápido
+          const result = await bot.sendMessage(
+            chatId,
+            '⚠️ Error al procesar tu mensaje.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+            'Escribe /start para comenzar.'
+          )
+          console.log('[TELEGRAM WEBHOOK] ✅ Mensaje de error enviado desde catch principal. Message ID:', result?.message_id)
         }
       } catch (sendErr) {
         console.error('[TELEGRAM WEBHOOK] ❌ Error enviando mensaje desde catch principal:', sendErr)
       }
-    })
-    
-    // No esperar, pero asegurarnos de que la promesa no se pierda
-    // Esto ayuda a que Vercel no termine la función antes de tiempo
-    processPromise.catch(() => {}) // Swallow errors, ya los manejamos arriba
+    }))
 
     // Responder inmediatamente a Telegram (requerido por la API de Telegram)
-    // El procesamiento continúa en background
+    // El procesamiento continúa en background pero waitUntil asegura que se complete
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[TELEGRAM WEBHOOK] Error en webhook:', error)

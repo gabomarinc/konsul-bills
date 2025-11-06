@@ -344,10 +344,35 @@ async function processTelegramUpdate(update: any) {
           '/clientes - Ver tus clientes\n' +
           '/ayuda - Ver ayuda'
       } else {
-        immediateMessage = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
-          'Por favor, intenta de nuevo en unos segundos.\n\n' +
-          'Tu Telegram ID es: `' + telegramId + '`\n\n' +
-          'Escribe /start para comenzar.'
+        // Mensaje más útil para cuando el usuario quiere hacer algo específico
+        const lowerText = text.toLowerCase()
+        if (lowerText.includes('factura') || lowerText.includes('invoice')) {
+          immediateMessage = '📝 Para crear una factura, necesito acceso a la base de datos.\n\n' +
+            '⚠️ Hay un problema temporal de conexión.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            'Mientras tanto, puedes:\n' +
+            '• Escribir /start para ver comandos\n' +
+            '• Esperar unos segundos y volver a intentar\n\n' +
+            'Tu Telegram ID: `' + telegramId + '`'
+        } else if (lowerText.includes('cotización') || lowerText.includes('quote') || lowerText.includes('cotizacion')) {
+          immediateMessage = '📋 Para crear una cotización, necesito acceso a la base de datos.\n\n' +
+            '⚠️ Hay un problema temporal de conexión.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            'Mientras tanto, puedes:\n' +
+            '• Escribir /start para ver comandos\n' +
+            '• Esperar unos segundos y volver a intentar\n\n' +
+            'Tu Telegram ID: `' + telegramId + '`'
+        } else {
+          immediateMessage = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+            'Por favor, intenta de nuevo en unos segundos.\n\n' +
+            'Puedo ayudarte con:\n' +
+            '• Crear facturas: /crear_factura\n' +
+            '• Crear cotizaciones: /crear_cotizacion\n' +
+            '• Ver clientes: /clientes\n' +
+            '• Ayuda: /ayuda\n\n' +
+            'Tu Telegram ID: `' + telegramId + '`\n\n' +
+            'Escribe /start para comenzar.'
+        }
       }
       
       // ENVIAR INMEDIATAMENTE - CRÍTICO: Esperar a que se complete

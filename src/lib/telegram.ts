@@ -68,17 +68,9 @@ export async function getTelegramUser(telegramId: string) {
   try {
     // Normalizar el telegramId (eliminar espacios, asegurar que sea string)
     const normalizedId = String(telegramId).trim()
-    console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId, '(tipo:', typeof normalizedId, ')')
+    console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId)
     
-    // También buscar todos los usuarios para debug
-    const allUsers = await prisma.telegramUser.findMany({ take: 10 })
-    console.log('[TELEGRAM DB] Todos los usuarios en DB:', allUsers.map(u => ({ 
-      id: u.id, 
-      telegramId: u.telegramId, 
-      telegramIdType: typeof u.telegramId,
-      matches: u.telegramId === normalizedId 
-    })))
-    
+    // Usar findUnique directamente (más eficiente y no agota el pool)
     const result = await prisma.telegramUser.findUnique({
       where: { telegramId: normalizedId },
       include: {

@@ -100,7 +100,8 @@ export async function POST(req: NextRequest) {
 
     // Procesar el update de forma asíncrona (no esperar respuesta)
     // IMPORTANTE: No usar await aquí para responder rápido a Telegram
-    processTelegramUpdate(update).catch(async (error) => {
+    // PERO asegurarnos de que el mensaje se envíe usando un wrapper que no se detenga
+    const processPromise = processTelegramUpdate(update).catch(async (error) => {
       console.error('[TELEGRAM WEBHOOK] Error procesando update:', error)
       console.error('[TELEGRAM WEBHOOK] Stack:', error instanceof Error ? error.stack : 'No stack')
       
@@ -112,19 +113,29 @@ export async function POST(req: NextRequest) {
         
         if (bot && chatId) {
           console.log('[TELEGRAM WEBHOOK] Intentando enviar mensaje de error desde catch principal')
-          await bot.sendMessage(
-            chatId,
-            '⚠️ Error al procesar tu mensaje.\n\n' +
-            'Por favor, intenta de nuevo en unos segundos.\n\n' +
-            `Tu Telegram ID es: \`${telegramId}\`\n\n` +
-            'Escribe /start para comenzar.'
-          )
+          // Usar Promise.race con timeout para asegurar que se complete
+          await Promise.race([
+            bot.sendMessage(
+              chatId,
+              '⚠️ Error al procesar tu mensaje.\n\n' +
+              'Por favor, intenta de nuevo en unos segundos.\n\n' +
+              `Tu Telegram ID es: \`${telegramId}\`\n\n` +
+              'Escribe /start para comenzar.'
+            ),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout en catch principal')), 10000)
+            )
+          ])
           console.log('[TELEGRAM WEBHOOK] ✅ Mensaje de error enviado desde catch principal')
         }
       } catch (sendErr) {
         console.error('[TELEGRAM WEBHOOK] ❌ Error enviando mensaje desde catch principal:', sendErr)
       }
     })
+    
+    // No esperar, pero asegurarnos de que la promesa no se pierda
+    // Esto ayuda a que Vercel no termine la función antes de tiempo
+    processPromise.catch(() => {}) // Swallow errors, ya los manejamos arriba
 
     // Responder inmediatamente a Telegram (requerido por la API de Telegram)
     // El procesamiento continúa en background
@@ -211,8 +222,10 @@ async function processTelegramUpdate(update: any) {
         console.log('[TELEGRAM] Usuario encontrado - ID:', telegramUser.id, 'UserId:', telegramUser.userId)
       }
     } catch (error: any) {
-      console.log('[TELEGRAM] 🔴 ENTRANDO AL CATCH INTERNO')
+      console.log('[TELEGRAM] 🔴🔴🔴 ENTRANDO AL CATCH INTERNO 🔴🔴🔴')
       console.error('[TELEGRAM] ❌❌❌ ERROR CAPTURADO EN CATCH ❌❌❌')
+      console.error('[TELEGRAM] Tipo de error:', error?.constructor?.name)
+      console.error('[TELEGRAM] Error es instancia de Error?', error instanceof Error)
       console.error('[TELEGRAM] Error buscando usuario:', error?.code || error?.message)
       console.error('[TELEGRAM] Error name:', error?.name)
       console.error('[TELEGRAM] Error completo:', JSON.stringify({

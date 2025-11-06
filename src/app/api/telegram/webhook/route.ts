@@ -219,17 +219,18 @@ async function handleCommand(
 ) {
   const bot = getBot()
   if (!bot) {
-    console.error('Bot no inicializado en handleCommand')
+    console.error('[TELEGRAM] Bot no inicializado en handleCommand')
     return
   }
 
   const cmd = command.split(' ')[0].toLowerCase()
-  console.log('Procesando comando:', cmd, 'para chatId:', chatId)
+  console.log('[TELEGRAM] Procesando comando:', cmd, 'para chatId:', chatId)
 
   try {
     switch (cmd) {
     case '/start':
-      await bot.sendMessage(
+      console.log('[TELEGRAM] Enviando mensaje de /start')
+      const startResult = await bot.sendMessage(
         chatId,
         '👋 ¡Hola! Soy tu asistente de Konsul Bills.\n\n' +
         'Comandos disponibles:\n' +
@@ -239,20 +240,24 @@ async function handleCommand(
         '/cancelar - Cancelar operación en curso\n' +
         '/ayuda - Mostrar esta ayuda'
       )
+      console.log('[TELEGRAM] Mensaje /start enviado:', startResult?.message_id)
       clearConversationState(chatId)
       break
 
     case '/crear_factura':
+      console.log('[TELEGRAM] Procesando /crear_factura')
       setConversationState(chatId, {
         state: 'creating_invoice_client',
         draft: { type: 'invoice', items: [] }
       })
-      await bot.sendMessage(
+      console.log('[TELEGRAM] Enviando mensaje de pregunta sobre cliente')
+      const invoiceResult = await bot.sendMessage(
         chatId,
         '📝 Creando nueva factura...\n\n' +
         '¿Cuál es el nombre del cliente?\n' +
         '(Puedes escribir el nombre completo o buscar entre tus clientes)'
       )
+      console.log('[TELEGRAM] Mensaje de /crear_factura enviado:', invoiceResult?.message_id)
       break
 
     case '/crear_cotizacion':

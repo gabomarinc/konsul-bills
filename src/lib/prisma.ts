@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client"
+import { PrismaClient, Prisma } from "@prisma/client"
 
 declare global {
   // eslint-disable-next-line no-var
@@ -6,14 +6,10 @@ declare global {
 }
 
 // Configuración optimizada para Vercel serverless
-const prismaClientOptions = {
-  log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  // Configuración para entornos serverless
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
+const prismaClientOptions: Prisma.PrismaClientOptions = {
+  log: process.env.NODE_ENV === "development" 
+    ? (["error", "warn"] as Prisma.LogLevel[])
+    : (["error"] as Prisma.LogLevel[]),
 }
 
 // Crear una instancia única del cliente Prisma

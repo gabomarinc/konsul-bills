@@ -137,15 +137,25 @@ async function processTelegramUpdate(update: any) {
       
       // Si es un error de conexión a la base de datos, tratar como usuario no vinculado
       // y enviar mensaje de bienvenida
-      if (error?.code === 'P2024' || error?.message?.includes('connection pool') || error?.message?.includes('timeout')) {
-        console.log('[TELEGRAM] ⚠️ Error de conexión a BD (P2024), tratando como usuario no vinculado')
+      if (error?.code === 'P2024' || 
+          error?.message?.includes('connection pool') || 
+          error?.message?.includes('timeout') ||
+          error?.message?.includes("Can't reach database") ||
+          error?.message?.includes('Database query timeout')) {
+        console.log('[TELEGRAM] ⚠️ Error de conexión a BD, tratando como usuario no vinculado')
         console.log('[TELEGRAM] Enviando mensaje de bienvenida a pesar del error de BD')
         
         // Intentar enviar mensaje de bienvenida incluso si falló la BD
         try {
-          const isStart = text.toLowerCase().trim() === '/start' || text.toLowerCase().trim() === 'hola' || text.toLowerCase().trim() === 'hi'
-          const messageText = isStart
-            ? '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
+          const command = text.toLowerCase().trim()
+          const isStart = command === '/start' || command === 'hola' || command === 'hi'
+          const isCreateInvoice = command === '/crear_factura' || command.startsWith('/crear_factura')
+          const isCreateQuote = command === '/crear_cotizacion' || command.startsWith('/crear_cotizacion')
+          
+          let messageText = ''
+          
+          if (isStart) {
+            messageText = '👋 ¡Hola! Bienvenido a Konsul Bills.\n\n' +
               '⚠️ Hay un problema temporal con la base de datos.\n\n' +
               'Tu Telegram ID es: `' + telegramId + '`\n\n' +
               'Por favor, intenta de nuevo en unos segundos.\n\n' +
@@ -154,10 +164,24 @@ async function processTelegramUpdate(update: any) {
               '/crear_cotizacion - Crear una cotización\n' +
               '/clientes - Ver tus clientes\n' +
               '/ayuda - Ver ayuda'
-            : '⚠️ Error temporal de conexión con la base de datos.\n\n' +
+          } else if (isCreateInvoice) {
+            messageText = '📝 Para crear una factura, necesito acceso a la base de datos.\n\n' +
+              '⚠️ Hay un problema temporal de conexión.\n\n' +
+              'Por favor, intenta de nuevo en unos segundos.\n\n' +
+              'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+              'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
+          } else if (isCreateQuote) {
+            messageText = '📋 Para crear una cotización, necesito acceso a la base de datos.\n\n' +
+              '⚠️ Hay un problema temporal de conexión.\n\n' +
+              'Por favor, intenta de nuevo en unos segundos.\n\n' +
+              'Tu Telegram ID es: `' + telegramId + '`\n\n' +
+              'Si el problema persiste, verifica tu conexión a internet o contacta al soporte.'
+          } else {
+            messageText = '⚠️ Error temporal de conexión con la base de datos.\n\n' +
               'Por favor, intenta de nuevo en unos segundos.\n\n' +
               'Tu Telegram ID es: `' + telegramId + '`\n\n' +
               'Escribe /start para comenzar.'
+          }
           
           const errorMessage = await bot.sendMessage(chatId, messageText)
           console.log('[TELEGRAM] ✅ Mensaje enviado a pesar del error de BD. Message ID:', errorMessage?.message_id)
@@ -166,8 +190,9 @@ async function processTelegramUpdate(update: any) {
           // Último intento con mensaje muy simple
           try {
             await bot.sendMessage(chatId, '👋 Hola! Tu ID: ' + telegramId + '. Error temporal, intenta más tarde.')
-          } catch (finalError) {
-            console.error('[TELEGRAM] ❌ Error crítico enviando mensaje:', finalError)
+            console.log('[TELEGRAM] ✅ Mensaje de fallback enviado')
+          } catch (finalError: any) {
+            console.error('[TELEGRAM] ❌ Error crítico enviando mensaje:', finalError?.message || finalError)
           }
         }
         return // Salir sin lanzar el error para que el webhook responda 200

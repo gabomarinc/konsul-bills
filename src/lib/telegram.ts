@@ -76,6 +76,7 @@ export async function getTelegramUser(telegramId: string) {
       console.log('[TELEGRAM DB] Buscando telegramId en DB:', normalizedId, `(intentos restantes: ${retries})`)
       
       // Usar findUnique directamente (más eficiente y no agota el pool)
+      // Timeout más corto para responder rápido al usuario
       const result = await Promise.race([
         prisma.telegramUser.findUnique({
           where: { telegramId: normalizedId },
@@ -95,9 +96,9 @@ export async function getTelegramUser(telegramId: string) {
             }
           }
         }),
-        // Timeout de 8 segundos (menos que el timeout del pool)
+        // Timeout de 3 segundos (responder rápido al usuario)
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Database query timeout')), 8000)
+          setTimeout(() => reject(new Error('Database query timeout')), 3000)
         )
       ]) as any
       
@@ -107,12 +108,15 @@ export async function getTelegramUser(telegramId: string) {
       lastError = error
       console.error(`[TELEGRAM DB] Error en getTelegramUser (intento ${3 - retries}):`, error?.code || error?.message)
       
-      // Si es un error de pool, esperar un poco antes de reintentar
-      if (error?.code === 'P2024' || error?.message?.includes('connection pool')) {
+      // Si es un error de pool o timeout, esperar un poco antes de reintentar
+      if (error?.code === 'P2024' || 
+          error?.message?.includes('connection pool') || 
+          error?.message?.includes('timeout') ||
+          error?.message?.includes("Can't reach database")) {
         retries--
         if (retries > 0) {
-          console.log('[TELEGRAM DB] Reintentando después de error de pool...')
-          await new Promise(resolve => setTimeout(resolve, 1000)) // Esperar 1 segundo
+          console.log('[TELEGRAM DB] Reintentando después de error de pool/timeout...')
+          await new Promise(resolve => setTimeout(resolve, 500)) // Esperar 0.5 segundos
           continue
         }
       } else {

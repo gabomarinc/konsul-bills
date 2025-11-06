@@ -207,19 +207,48 @@ async function processTelegramUpdate(update: any) {
   )
 
   // Función para enviar respuesta inmediata (sin esperar BD)
+  // CRÍTICO: Esta función DEBE completarse antes de que termine la función de Vercel
   const sendImmediateResponse = async (message: string) => {
     try {
-      console.log('[TELEGRAM] 🚀 ENVIANDO RESPUESTA INMEDIATA:', message.substring(0, 50) + '...')
-      const result = await Promise.race([
-        bot.sendMessage(chatId, message),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout enviando mensaje')), 5000)
-        )
-      ]) as any
+      console.log('[TELEGRAM] 🚀🚀🚀 ENVIANDO RESPUESTA INMEDIATA 🚀🚀🚀')
+      console.log('[TELEGRAM] Mensaje:', message.substring(0, 100) + '...')
+      console.log('[TELEGRAM] ChatId:', chatId)
+      console.log('[TELEGRAM] Bot disponible?', bot ? 'Sí' : 'No')
+      
+      if (!bot) {
+        console.error('[TELEGRAM] ❌ Bot no disponible')
+        return null
+      }
+      
+      // Enviar directamente sin Promise.race para asegurar que se complete
+      console.log('[TELEGRAM] Llamando bot.sendMessage...')
+      const result = await bot.sendMessage(chatId, message)
       console.log('[TELEGRAM] ✅✅✅ RESPUESTA ENVIADA EXITOSAMENTE. Message ID:', result?.message_id)
+      console.log('[TELEGRAM] Resultado completo:', JSON.stringify(result))
       return result
     } catch (err: any) {
-      console.error('[TELEGRAM] ❌ Error enviando respuesta inmediata:', err?.message)
+      console.error('[TELEGRAM] ❌❌❌ ERROR ENVIANDO RESPUESTA INMEDIATA ❌❌❌')
+      console.error('[TELEGRAM] Error:', err?.message || err)
+      console.error('[TELEGRAM] Error code:', err?.code)
+      console.error('[TELEGRAM] Error response:', err?.response ? JSON.stringify(err.response) : 'No response')
+      
+      // Último intento con timeout más corto
+      if (bot) {
+        try {
+          console.log('[TELEGRAM] 🔄 Último intento con timeout...')
+          const fallbackResult = await Promise.race([
+            bot.sendMessage(chatId, message),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout final')), 3000)
+            )
+          ]) as any
+          console.log('[TELEGRAM] ✅✅✅ RESPUESTA ENVIADA EN FALLBACK. Message ID:', fallbackResult?.message_id)
+          return fallbackResult
+        } catch (finalErr: any) {
+          console.error('[TELEGRAM] ❌❌❌ ERROR CRÍTICO - NO SE PUDO ENVIAR:', finalErr?.message)
+        }
+      }
+      
       return null
     }
   }

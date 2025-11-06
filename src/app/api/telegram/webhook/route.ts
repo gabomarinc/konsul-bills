@@ -316,25 +316,36 @@ async function processTelegramUpdate(update: any) {
           'Escribe /start para comenzar.'
       }
       
-      // ENVIAR INMEDIATAMENTE
-      const sendResult = await sendImmediateResponse(immediateMessage)
+      // ENVIAR INMEDIATAMENTE - CRÍTICO: Esperar a que se complete
+      console.log('[TELEGRAM] 🚀 INICIANDO ENVÍO INMEDIATO...')
+      let sendResult = null
       
-      if (sendResult) {
-        console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO EXITOSAMENTE')
-      } else {
-        console.error('[TELEGRAM] ❌ FALLO ENVÍO INMEDIATO, intentando con IA...')
-        
-        // Si falla el envío inmediato, intentar con IA en background
+      try {
+        sendResult = await sendImmediateResponse(immediateMessage)
+        console.log('[TELEGRAM] Resultado de sendImmediateResponse:', sendResult ? 'Éxito' : 'Falló')
+      } catch (sendErr: any) {
+        console.error('[TELEGRAM] ❌ Error en sendImmediateResponse:', sendErr?.message)
+        sendResult = null
+      }
+      
+      // Si falló, intentar de nuevo con mensaje más simple
+      if (!sendResult) {
+        console.error('[TELEGRAM] ❌ FALLO ENVÍO INMEDIATO, intentando mensaje simple...')
         try {
-          const aiMessage = await generateConversationalResponse(text, {
-            telegramId,
-            isLinked: false,
-            hasDatabaseError: true
-          })
-          await sendImmediateResponse(aiMessage)
-        } catch (aiErr) {
-          console.error('[TELEGRAM] Error con IA también:', aiErr)
+          const simpleMessage = '👋 ¡Hola! Hay un problema temporal. Tu ID: `' + telegramId + '`. Escribe /start'
+          console.log('[TELEGRAM] Intentando enviar mensaje simple...')
+          sendResult = await bot.sendMessage(chatId, simpleMessage)
+          console.log('[TELEGRAM] ✅✅✅ MENSAJE SIMPLE ENVIADO. Message ID:', sendResult?.message_id)
+        } catch (simpleErr: any) {
+          console.error('[TELEGRAM] ❌❌❌ ERROR EN MENSAJE SIMPLE:', simpleErr?.message)
         }
+      } else {
+        console.log('[TELEGRAM] ✅✅✅ MENSAJE ENVIADO EXITOSAMENTE')
+      }
+      
+      // Asegurarnos de que el mensaje se haya enviado antes de terminar
+      if (!sendResult) {
+        console.error('[TELEGRAM] ⚠️⚠️⚠️ NO SE PUDO ENVIAR NINGÚN MENSAJE ⚠️⚠️⚠️')
       }
       
       console.log('[TELEGRAM] 🏁 FINALIZANDO CATCH - Retornando...')

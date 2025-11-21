@@ -33,21 +33,25 @@ import {
 export default function SettingsPage() {
   const { t } = useTranslation()
   const [profileSettings, setProfileSettings] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john@company.com",
-    companyName: "Acme Inc.",
-    phone: "+1 (555) 123-4567",
-    timezone: "Eastern Standard Time"
+    firstName: "",
+    lastName: "",
+    email: "",
+    companyName: "",
+    phone: "",
+    timezone: "Europe/Madrid"
   })
 
   const [businessSettings, setBusinessSettings] = useState({
-    businessAddress: "123 Business St, Suite 100, New York, NY 10001",
-    taxId: "12-3456789",
-    defaultCurrency: "USD",
-    defaultTaxRate: 10.00,
-    defaultPaymentTerms: "Net 30 days"
+    businessAddress: "",
+    taxId: "",
+    defaultCurrency: "EUR",
+    defaultTaxRate: 21.00,
+    defaultPaymentTerms: "Net 30 días"
   })
+
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [loadingBusiness, setLoadingBusiness] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
 
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
@@ -84,12 +88,100 @@ export default function SettingsPage() {
   const [telegramIdInput, setTelegramIdInput] = useState("")
 
 
-  const handleProfileUpdate = () => {
-    console.log("Updating profile:", profileSettings)
+  // Cargar datos iniciales
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setLoadingData(true)
+        
+        // Cargar perfil
+        const profileResponse = await fetch("/api/settings/profile", {
+          credentials: "include"
+        })
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          setProfileSettings({
+            firstName: profileData.firstName || "",
+            lastName: profileData.lastName || "",
+            email: profileData.email || "",
+            companyName: profileData.companyName || "",
+            phone: profileData.phone || "",
+            timezone: profileData.timezone || "Europe/Madrid"
+          })
+        }
+
+        // Cargar configuración de negocio
+        const businessResponse = await fetch("/api/settings/business", {
+          credentials: "include"
+        })
+        if (businessResponse.ok) {
+          const businessData = await businessResponse.json()
+          setBusinessSettings({
+            businessAddress: businessData.businessAddress || "",
+            taxId: businessData.taxId || "",
+            defaultCurrency: businessData.defaultCurrency || "EUR",
+            defaultTaxRate: businessData.defaultTaxRate || 21.00,
+            defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días"
+          })
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadSettings()
+  }, [])
+
+  const handleProfileUpdate = async () => {
+    try {
+      setLoadingProfile(true)
+      
+      const response = await fetch("/api/settings/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(profileSettings)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Error al guardar perfil")
+      }
+
+      alert("✅ Perfil actualizado exitosamente")
+    } catch (error: any) {
+      console.error("Error updating profile:", error)
+      alert(`Error: ${error.message || "Error al guardar perfil"}`)
+    } finally {
+      setLoadingProfile(false)
+    }
   }
 
-  const handleBusinessUpdate = () => {
-    console.log("Updating business settings:", businessSettings)
+  const handleBusinessUpdate = async () => {
+    try {
+      setLoadingBusiness(true)
+      
+      const response = await fetch("/api/settings/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(businessSettings)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Error al guardar configuración")
+      }
+
+      alert("✅ Configuración de negocio guardada exitosamente")
+    } catch (error: any) {
+      console.error("Error updating business settings:", error)
+      alert(`Error: ${error.message || "Error al guardar configuración"}`)
+    } finally {
+      setLoadingBusiness(false)
+    }
   }
 
   const handleIntegrationToggle = (integration: string) => {
@@ -315,17 +407,26 @@ export default function SettingsPage() {
                     onChange={(e) => setProfileSettings(prev => ({ ...prev, timezone: e.target.value }))}
                     className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm mt-1"
                   >
-                    <option value="Eastern Standard Time">Eastern Standard Time</option>
-                    <option value="Central Standard Time">Central Standard Time</option>
-                    <option value="Mountain Standard Time">Mountain Standard Time</option>
-                    <option value="Pacific Standard Time">Pacific Standard Time</option>
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                    <option value="Europe/Madrid">Madrid (CET)</option>
+                    <option value="Europe/London">London (GMT)</option>
+                    <option value="Europe/Paris">Paris (CET)</option>
+                    <option value="America/Mexico_City">Mexico City (CST)</option>
+                    <option value="America/Buenos_Aires">Buenos Aires (ART)</option>
                     <option value="UTC">UTC</option>
                   </select>
                 </div>
               </div>
               
-              <Button onClick={handleProfileUpdate} className="mt-6 w-full bg-teal-600 hover:bg-teal-700">
-                {t.settings.updateProfile}
+              <Button 
+                onClick={handleProfileUpdate} 
+                className="mt-6 w-full bg-teal-600 hover:bg-teal-700"
+                disabled={loadingProfile || loadingData}
+              >
+                {loadingProfile ? "Guardando..." : t.settings.updateProfile}
               </Button>
             </Card>
 
@@ -532,8 +633,12 @@ export default function SettingsPage() {
                 </div>
               </div>
               
-              <Button onClick={handleBusinessUpdate} className="mt-6 w-full bg-teal-600 hover:bg-teal-700">
-                {t.settings.saveBusinessSettings}
+              <Button 
+                onClick={handleBusinessUpdate} 
+                className="mt-6 w-full bg-teal-600 hover:bg-teal-700"
+                disabled={loadingBusiness || loadingData}
+              >
+                {loadingBusiness ? "Guardando..." : t.settings.saveBusinessSettings}
               </Button>
             </Card>
 

@@ -6,7 +6,7 @@ import { verifyToken, SESSION_COOKIE_NAME } from "./lib/jwt"
 const publicRoutes = ['/auth/signin', '/auth/signup', '/api/auth/login', '/api/auth/register', '/api/stripe/webhook', '/api/cron']
 
 // Rutas de API que requieren autenticación
-const protectedApiRoutes = ['/api/invoices', '/api/quotes', '/api/profile', '/api/ai']
+const protectedApiRoutes = ['/api/invoices', '/api/quotes', '/api/profile', '/api/ai', '/api/settings']
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -57,6 +57,7 @@ export const config = {
     "/api/invoices/:path*",
     "/api/quotes/:path*",
     "/api/profile/:path*",
-    "/api/ai/:path*"
+    "/api/ai/:path*",
+    "/api/settings/:path*"
   ]
 }

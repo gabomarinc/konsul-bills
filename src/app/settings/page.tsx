@@ -329,10 +329,11 @@ export default function SettingsPage() {
             <Button
               type="button"
               onClick={() => console.log("Onboarding clicked")}
-              className="relative h-12 w-full rounded-2xl font-semibold text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
+              disabled
+              className="relative h-12 w-full rounded-2xl font-semibold text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all opacity-60 cursor-not-allowed"
             >
               <span className="absolute -top-2 -right-2 rounded-full bg-amber-400 text-amber-950 text-[10px] px-2 py-0.5 shadow ring-1 ring-amber-500/40">
-                NUEVO
+                En Desarrollo
               </span>
               {t.settings.completeProfileTitle}
             </Button>

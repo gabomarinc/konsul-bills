@@ -88,6 +88,13 @@ export async function POST(req: NextRequest) {
 
     // Obtener empresa del usuario
     const company = await getUserCompany(authUser.userId)
+    
+    if (!company) {
+      return NextResponse.json(
+        { error: "No se pudo obtener la empresa del usuario" },
+        { status: 500 }
+      )
+    }
 
     // Actualizar usuario
     await prisma.user.update({
@@ -100,7 +107,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Actualizar nombre de la empresa si se proporciona
-    if (companyName && company) {
+    if (companyName) {
       await prisma.company.update({
         where: { id: company.id },
         data: {
@@ -111,36 +118,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Actualizar o crear CompanySettings
-    if (company) {
-      const settingsData: any = {
-        updatedAt: new Date()
-      }
-
-      if (phone !== undefined) {
-        settingsData.phone = phone || null
-      }
-
-      if (timezone !== undefined) {
-        settingsData.timezone = timezone || "Europe/Madrid"
-      }
-
-      await prisma.companySettings.upsert({
-        where: { companyId: company.id },
-        update: settingsData,
-        create: {
-          id: generateId('settings'),
-          companyId: company.id,
-          phone: phone || null,
-          timezone: timezone || "Europe/Madrid",
-          defaultCurrency: "EUR",
-          defaultTaxRate: 21,
-          locale: "es-ES",
-          quotePrefix: "Q-",
-          invoicePrefix: "INV-",
-          numberPadding: 5
-        }
-      })
+    const settingsData: any = {
+      updatedAt: new Date()
     }
+
+    if (phone !== undefined) {
+      settingsData.phone = phone || null
+    }
+
+    if (timezone !== undefined) {
+      settingsData.timezone = timezone || "Europe/Madrid"
+    }
+
+    await prisma.companySettings.upsert({
+      where: { companyId: company.id },
+      update: settingsData,
+      create: {
+        id: generateId('settings'),
+        companyId: company.id,
+        phone: phone || null,
+        timezone: timezone || "Europe/Madrid",
+        defaultCurrency: "EUR",
+        defaultTaxRate: 21,
+        locale: "es-ES",
+        quotePrefix: "Q-",
+        invoicePrefix: "INV-",
+        numberPadding: 5
+      }
+    })
 
     return NextResponse.json({ 
       success: true,
@@ -148,6 +153,12 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error updating profile:", error)
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack
+    })
     
     // Manejar error de email duplicado
     if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
@@ -157,8 +168,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Retornar mensaje de error más específico si está disponible
+    const errorMessage = error.message || "Error al actualizar perfil"
     return NextResponse.json(
-      { error: "Error al actualizar perfil" },
+      { error: errorMessage },
       { status: 500 }
     )
   }

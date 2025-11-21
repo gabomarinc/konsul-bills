@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     let country = ""
 
     if (businessAddress) {
-      const parts = businessAddress.split(',').map(p => p.trim())
+      const parts = businessAddress.split(',').map((p: string) => p.trim())
       
       if (parts.length >= 1) addressLine1 = parts[0]
       if (parts.length >= 2) addressLine2 = parts[1]

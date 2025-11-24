@@ -1,3 +1,5 @@
+"use client"
+
 import QuoteForm from "@/components/konsul/QuoteForm"
 import { useTranslation } from "@/contexts/LanguageContext"
 

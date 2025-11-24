@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     const settingsData: any = {
       taxId: taxId || null,
       defaultCurrency: defaultCurrency || "EUR",
-      defaultTaxRate: defaultTaxRate ? parseFloat(defaultTaxRate) : 21,
+      defaultTaxRate: defaultTaxRate !== undefined && defaultTaxRate !== null ? parseFloat(defaultTaxRate) : 21,
       addressLine1: addressLine1 || null,
       addressLine2: addressLine2 || null,
       city: city || null,

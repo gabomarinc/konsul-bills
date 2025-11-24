@@ -610,7 +610,10 @@ export default function SettingsPage() {
                   <Input
                     type="number"
                     value={businessSettings.defaultTaxRate}
-                    onChange={(e) => setBusinessSettings(prev => ({ ...prev, defaultTaxRate: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                      setBusinessSettings(prev => ({ ...prev, defaultTaxRate: isNaN(value) ? 0 : value }))
+                    }}
                     min="0"
                     max="100"
                     step="0.01"
@@ -723,9 +726,9 @@ export default function SettingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setStripeDialogOpen(true)}
+                      disabled
                     >
-                      {stripeSettings.enabled ? "Configurar" : t.settings.connect}
+                      En Desarrollo
                     </Button>
                   </div>
                 </div>
@@ -748,23 +751,13 @@ export default function SettingsPage() {
                     <Badge variant={telegramSettings.linked ? "default" : "secondary"}>
                       {telegramSettings.linked ? "Vinculado" : "No vinculado"}
                     </Badge>
-                    {telegramSettings.linked ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleTelegramUnlink}
-                      >
-                        Desvincular
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setTelegramDialogOpen(true)}
-                      >
-                        Vincular
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                    >
+                      En Desarrollo
+                    </Button>
                   </div>
                 </div>
                 

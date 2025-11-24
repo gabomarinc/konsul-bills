@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       businessAddress,
       taxId: settings.taxId || "",
       defaultCurrency: settings.defaultCurrency || "EUR",
-      defaultTaxRate: settings.defaultTaxRate || 21,
+      defaultTaxRate: settings.defaultTaxRate ?? 21,
       defaultPaymentTerms: "Net 30 días" // Por ahora fijo, se puede agregar al schema después
     })
   } catch (error) {

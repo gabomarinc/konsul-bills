@@ -120,7 +120,7 @@ export default function SettingsPage() {
             businessAddress: businessData.businessAddress || "",
             taxId: businessData.taxId || "",
             defaultCurrency: businessData.defaultCurrency || "EUR",
-            defaultTaxRate: businessData.defaultTaxRate || 21.00,
+            defaultTaxRate: businessData.defaultTaxRate ?? 21.00,
             defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días"
           })
         }

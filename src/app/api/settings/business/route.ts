@@ -102,8 +102,7 @@ export async function POST(req: NextRequest) {
       city: city || null,
       state: state || null,
       zip: zip || null,
-      country: country || null,
-      updatedAt: new Date()
+      country: country || null
     }
 
     // Actualizar o crear CompanySettings

@@ -118,9 +118,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Actualizar o crear CompanySettings
-    const settingsData: any = {
-      updatedAt: new Date()
-    }
+    const settingsData: any = {}
 
     if (phone !== undefined) {
       settingsData.phone = phone || null

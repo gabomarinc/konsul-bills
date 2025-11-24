@@ -1,16 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import { useTranslation } from "@/contexts/LanguageContext"
+import { useInvalidateQuotes } from "@/hooks/useQuotes"
 
 export type UIStatus = "draft" | "sent" | "accepted" | "rejected"
-
-const LABELS: Record<UIStatus, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  accepted: "Accepted",
-  rejected: "Rejected",
-}
 
 type Props = {
   id: string
@@ -20,8 +15,22 @@ type Props = {
 }
 
 export default function StatusDropdown({ id, value, onChange, className = "" }: Props) {
+  const { t } = useTranslation()
+  const invalidateQuotes = useInvalidateQuotes()
   const [val, setVal] = useState<UIStatus>(value)
   const [loading, setLoading] = useState(false)
+
+  // Actualizar valor cuando cambia el prop
+  useEffect(() => {
+    setVal(value)
+  }, [value])
+
+  const LABELS: Record<UIStatus, string> = {
+    draft: t.quotes.draft,
+    sent: t.quotes.sent,
+    accepted: t.quotes.accepted,
+    rejected: t.quotes.rejected,
+  }
 
   async function update(next: UIStatus) {
     if (next === val) return
@@ -33,14 +42,16 @@ export default function StatusDropdown({ id, value, onChange, className = "" }: 
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: next }),
+        credentials: "include",
       })
       if (!res.ok) throw new Error(await res.text())
       onChange?.(next)
-      toast.success("Status updated")
+      invalidateQuotes() // Refrescar la lista de cotizaciones
+      toast.success(t.quotes.statusUpdated || "Estado actualizado")
     } catch (e) {
       console.error(e)
       setVal(prev)
-      toast.error("Could not update status")
+      toast.error(t.quotes.statusUpdateError || "Error al actualizar estado")
     } finally {
       setLoading(false)
     }
@@ -51,6 +62,7 @@ export default function StatusDropdown({ id, value, onChange, className = "" }: 
       value={val}
       disabled={loading}
       onChange={(e) => update(e.target.value as UIStatus)}
+      onClick={(e) => e.stopPropagation()}
       className={[
         "h-8 rounded-md border border-slate-200 bg-white px-2 text-xs md:text-sm",
         "outline-none focus:ring-2 focus:ring-slate-300",

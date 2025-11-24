@@ -169,6 +169,8 @@ export const en: TranslationKeys = {
     deleteError: "Error deleting quote",
     createSuccess: "Quote created successfully",
     createError: "Error creating quote",
+    statusUpdated: "Status updated successfully",
+    statusUpdateError: "Error updating status",
     updateSuccess: "Quote updated successfully",
     updateError: "Error updating quote",
     requiredFields: "Client and Title are required",

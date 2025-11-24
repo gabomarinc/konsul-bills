@@ -167,6 +167,8 @@ export const es = {
     deleteError: "Error al eliminar cotización",
     createSuccess: "Cotización creada exitosamente",
     createError: "Error al crear cotización",
+    statusUpdated: "Estado actualizado exitosamente",
+    statusUpdateError: "Error al actualizar estado",
     updateSuccess: "Cotización actualizada exitosamente",
     updateError: "Error al actualizar cotización",
     requiredFields: "Cliente y Título son obligatorios",

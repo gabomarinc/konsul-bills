@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
+import StatusDropdown from "@/components/konsul/StatusDropdown"
 import { useQuotes } from "@/hooks/useQuotes"
 import { 
   FileText, 
@@ -237,37 +238,12 @@ export default function QuotesPage() {
                     </TableCell>
                     
                     {/* Status */}
-                    <TableCell>
-                      {row.status === "accepted" && (
-                        <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 flex items-center gap-1 w-fit">
-                          <CheckCircle className="h-3 w-3" />
-                          {t.quotes.accepted}
-                        </Badge>
-                      )}
-                      {row.status === "draft" && (
-                        <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-100 border-gray-200 flex items-center gap-1 w-fit">
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                          {t.quotes.draft}
-                        </Badge>
-                      )}
-                      {row.status === "sent" && (
-                        <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 flex items-center gap-1 w-fit">
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                          </svg>
-                          {t.quotes.sent}
-                        </Badge>
-                      )}
-                      {row.status === "rejected" && (
-                        <Badge className="bg-red-100 text-red-700 hover:bg-red-100 border-red-200 flex items-center gap-1 w-fit">
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          {t.quotes.rejected}
-                        </Badge>
-                      )}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <StatusDropdown
+                        id={row.id}
+                        value={row.status}
+                        className="min-w-[120px]"
+                      />
                     </TableCell>
                     
                     {/* Date */}

@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     const clients = await prisma.client.findMany({
       where: { companyId: company.id },
-      orderBy: { name: "asc" },
+      orderBy: { createdAt: "desc" },
       select: {
         id: true,
         name: true,
@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
 
 
 

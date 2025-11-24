@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@/contexts/LanguageContext"
 import { Card } from "@/components/ui/card"
@@ -10,6 +10,12 @@ import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 import AIPromptDialog from "@/components/konsul/AIPromptDialog"
 import type { AIParsed } from "@/components/konsul/AIPromptDialog"
+
+type Client = {
+  id: string
+  name: string
+  email: string | null
+}
 
 type Item = { description: string; qty: number; price: number }
 export type QuoteDraft = {
@@ -34,6 +40,10 @@ export default function QuoteForm({ initial }: { initial?: QuoteDraft }) {
   const { t } = useTranslation()
   const isEdit = !!initial?.id
   const [isSaving, setIsSaving] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [loadingClients, setLoadingClients] = useState(true)
+  const [clientMode, setClientMode] = useState<"select" | "new">("select")
+  const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [form, setForm] = useState<QuoteDraft>(
     initial ?? {
       client: "",
@@ -48,6 +58,38 @@ export default function QuoteForm({ initial }: { initial?: QuoteDraft }) {
       status: "draft",
     }
   )
+
+  // Cargar clientes
+  useEffect(() => {
+    const loadClients = async () => {
+      try {
+        setLoadingClients(true)
+        const response = await fetch("/api/clients", {
+          credentials: "include"
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setClients(data.data || [])
+          
+          // Si hay datos iniciales, intentar encontrar el cliente
+          if (initial?.client) {
+            const foundClient = data.data?.find((c: Client) => c.name === initial.client)
+            if (foundClient) {
+              setSelectedClientId(foundClient.id)
+              setClientMode("select")
+            } else {
+              setClientMode("new")
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error loading clients:", error)
+      } finally {
+        setLoadingClients(false)
+      }
+    }
+    loadClients()
+  }, [initial])
 
   const subtotal = useMemo(
     () => form.items.reduce((acc, it) => acc + (Number(it.qty) || 0) * (Number(it.price) || 0), 0),
@@ -179,7 +221,67 @@ export default function QuoteForm({ initial }: { initial?: QuoteDraft }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <label htmlFor="client" className="block text-sm text-slate-600">{t.quotes.client}</label>
-            <Input id="client" value={form.client} onChange={e => setField("client", e.target.value)} placeholder={t.quotes.companyNamePlaceholder} aria-describedby="client-help" />
+            {clientMode === "select" ? (
+              <select
+                id="client"
+                value={selectedClientId}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (value === "__new__") {
+                    setClientMode("new")
+                    setSelectedClientId("")
+                    setField("client", "")
+                    setField("clientEmail", "")
+                  } else if (value) {
+                    setSelectedClientId(value)
+                    const selectedClient = clients.find(c => c.id === value)
+                    if (selectedClient) {
+                      setField("client", selectedClient.name)
+                      setField("clientEmail", selectedClient.email || "")
+                    }
+                  } else {
+                    setSelectedClientId("")
+                    setField("client", "")
+                    setField("clientEmail", "")
+                  }
+                }}
+                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+                disabled={loadingClients}
+                aria-describedby="client-help"
+              >
+                <option value="">Seleccionar cliente...</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+                <option value="__new__">+ Agregar cliente nuevo</option>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <Input 
+                  id="client" 
+                  value={form.client} 
+                  onChange={e => setField("client", e.target.value)} 
+                  placeholder={t.quotes.companyNamePlaceholder} 
+                  aria-describedby="client-help" 
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setClientMode("select")
+                    setSelectedClientId("")
+                    setField("client", "")
+                    setField("clientEmail", "")
+                  }}
+                  className="text-xs"
+                >
+                  Seleccionar cliente existente
+                </Button>
+              </div>
+            )}
             <p id="client-help" className="text-xs text-gray-500">{t.quotes.clientHelp}</p>
           </div>
 

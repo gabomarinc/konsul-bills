@@ -310,35 +310,67 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
   "function_calls": [{"name": "funcion", "arguments": {...}}]
 }`
 
-      // Intentar con gemini-pro que es más estable
-      console.log('[Chat API] Usando gemini-pro')
-      const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=" +
-          GEMINI_API_KEY,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: fullPrompt }]
-              }
-            ]
-          })
-        }
-      )
+      // Intentar con diferentes modelos de Gemini
+      const models = [
+        { name: "gemini-pro", url: "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent" },
+        { name: "gemini-1.5-flash", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent" },
+        { name: "gemini-1.5-pro", url: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent" }
+      ]
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('[Chat API] Error de Gemini:', errorText)
-        throw new Error(`Gemini API error: ${response.statusText} - ${errorText}`)
+      let response: Response | null = null
+      let lastError = ''
+      let modelUsed = ''
+
+      for (const model of models) {
+        try {
+          console.log(`[Chat API] Intentando con modelo: ${model.name}`)
+          response = await fetch(
+            `${model.url}?key=${GEMINI_API_KEY}`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: "user",
+                    parts: [{ text: fullPrompt }]
+                  }
+                ]
+              })
+            }
+          )
+
+          if (response.ok) {
+            modelUsed = model.name
+            console.log(`[Chat API] ✅ Modelo ${model.name} funcionó`)
+            break
+          } else {
+            const errorText = await response.text()
+            lastError = errorText
+            console.warn(`[Chat API] ❌ Modelo ${model.name} falló:`, errorText)
+            response = null
+          }
+        } catch (error: any) {
+          console.warn(`[Chat API] ❌ Error con modelo ${model.name}:`, error.message)
+          lastError = error.message
+          response = null
+        }
+      }
+
+      if (!response || !response.ok) {
+        console.error('[Chat API] Todos los modelos de Gemini fallaron. Último error:', lastError)
+        return NextResponse.json({
+          message: `Lo siento, hubo un error al conectar con Gemini. Por favor, verifica que GEMINI_API_KEY sea válido y que los modelos estén disponibles. Error: ${lastError.substring(0, 200)}`,
+          actions: []
+        }, { status: 500 })
       }
 
       const data = await response.json()
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+      
+      console.log(`[Chat API] Respuesta recibida de ${modelUsed}:`, text.substring(0, 100))
       
       try {
         const parsed = JSON.parse(text.replace(/```json\n?/g, "").replace(/```/g, ""))
@@ -346,7 +378,7 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
         functionCalls = parsed.function_calls || []
       } catch (parseError) {
         // Si no se puede parsear, usar el texto directamente
-        console.warn('[Chat API] No se pudo parsear respuesta de Gemini como JSON')
+        console.warn('[Chat API] No se pudo parsear respuesta de Gemini como JSON, usando texto plano')
         aiResponse = { message: { content: text } }
         functionCalls = []
       }

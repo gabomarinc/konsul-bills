@@ -16,7 +16,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
-import { useInvoices } from "@/hooks/useInvoices"
+import { useInvoices, useInvalidateInvoices } from "@/hooks/useInvoices"
+import { useEffect } from "react"
+import { toast } from "sonner"
 import { 
   FileText, 
   CheckCircle, 
@@ -59,8 +61,22 @@ export default function InvoicesPage() {
   const router = useRouter()
   const { t } = useTranslation()
   const { data = [], isLoading } = useInvoices()
+  const invalidateInvoices = useInvalidateInvoices()
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<Invoice["status"] | "all">("all")
+  
+  // Escuchar eventos de creación de facturas desde el chatbot
+  useEffect(() => {
+    const handleInvoiceCreated = () => {
+      invalidateInvoices()
+      toast.success("Factura creada exitosamente")
+    }
+    
+    window.addEventListener('invoiceCreated', handleInvoiceCreated)
+    return () => {
+      window.removeEventListener('invoiceCreated', handleInvoiceCreated)
+    }
+  }, [invalidateInvoices])
 
   // Calcular estadísticas
   const stats = useMemo(() => {

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
 import { useQuotes, useInvalidateQuotes } from "@/hooks/useQuotes"
+import { useInvalidateInvoices } from "@/hooks/useInvoices"
 import { toast } from "sonner"
 import { 
   DollarSign, 
@@ -58,19 +59,28 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   const { data = [], isLoading } = useQuotes()
   const invalidateQuotes = useInvalidateQuotes()
+  const invalidateInvoices = useInvalidateInvoices()
   
-  // Escuchar eventos de creación de cotizaciones desde el chatbot
+  // Escuchar eventos de creación de cotizaciones y facturas desde el chatbot
   useEffect(() => {
     const handleQuoteCreated = () => {
       invalidateQuotes()
       toast.success("Cotización creada exitosamente")
     }
     
+    const handleInvoiceCreated = () => {
+      invalidateInvoices()
+      invalidateQuotes() // También actualizar cotizaciones por si hay cambios relacionados
+      toast.success("Factura creada exitosamente")
+    }
+    
     window.addEventListener('quoteCreated', handleQuoteCreated)
+    window.addEventListener('invoiceCreated', handleInvoiceCreated)
     return () => {
       window.removeEventListener('quoteCreated', handleQuoteCreated)
+      window.removeEventListener('invoiceCreated', handleInvoiceCreated)
     }
-  }, [invalidateQuotes])
+  }, [invalidateQuotes, invalidateInvoices])
 
   // Calcular métricas
   const totalRevenue = useMemo(() => {

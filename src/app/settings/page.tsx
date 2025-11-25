@@ -893,7 +893,11 @@ const handleDiscardPending = async (id: string) => {
                       <Button
                         variant="default"
                         size="sm"
-                        onClick={() => setGmailWizardOpen(true)}
+                        onClick={() => {
+                          console.log("Click en Conectar, abriendo wizard...")
+                          setGmailWizardOpen(true)
+                          console.log("gmailWizardOpen debería ser true ahora")
+                        }}
                       >
                         Conectar
                         <ExternalLink className="h-4 w-4 ml-2" />

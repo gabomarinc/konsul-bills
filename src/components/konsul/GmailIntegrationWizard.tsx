@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useTranslation } from "@/contexts/LanguageContext"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -37,9 +37,13 @@ export default function GmailIntegrationWizard({
   onComplete 
 }: GmailIntegrationWizardProps) {
   const { t } = useTranslation()
-  const router = useRouter()
   const [currentStep, setCurrentStep] = useState<WizardStep>(1)
   const [isConnecting, setIsConnecting] = useState(false)
+
+  // Debug: Log when open changes
+  useEffect(() => {
+    console.log("GmailIntegrationWizard open:", open)
+  }, [open])
 
   const handleConnect = async () => {
     setIsConnecting(true)

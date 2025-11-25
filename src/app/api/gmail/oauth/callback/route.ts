@@ -3,6 +3,16 @@ import { exchangeCodeForTokens, encryptToken } from "@/lib/gmail-oauth"
 import { prisma } from "@/lib/prisma"
 import { generateId } from "@/lib/db"
 
+function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  return 'https://konsul-bills.vercel.app'
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
@@ -10,10 +20,7 @@ export async function GET(req: NextRequest) {
     const state = searchParams.get('state') // userId
     const error = searchParams.get('error')
 
-    // Determinar URL base para redirecciones
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    'https://konsul-bills.vercel.app'
+    const baseUrl = getBaseUrl()
 
     // Si hay error de Google
     if (error) {
@@ -79,22 +86,14 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Determinar URL base para redirecciones
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    'https://konsul-bills.vercel.app'
-
     // Redirigir a settings con éxito
     return NextResponse.redirect(
-      `${baseUrl}/settings?gmail_connected=true`
+      `${getBaseUrl()}/settings?gmail_connected=true`
     )
   } catch (error) {
     console.error("Error en OAuth callback:", error)
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    'https://konsul-bills.vercel.app'
     return NextResponse.redirect(
-      `${baseUrl}/settings?gmail_error=callback_failed`
+      `${getBaseUrl()}/settings?gmail_error=callback_failed`
     )
   }
 }

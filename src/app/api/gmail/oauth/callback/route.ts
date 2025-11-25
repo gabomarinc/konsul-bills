@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { exchangeCodeForTokens, encryptToken } from "@/lib/gmail-oauth"
 import { prisma } from "@/lib/prisma"
 import { generateId } from "@/lib/db"
+import { SESSION_COOKIE_NAME } from "@/lib/jwt"
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -162,9 +163,26 @@ export async function GET(req: NextRequest) {
     }
 
     // Redirigir a settings con éxito
-    return NextResponse.redirect(
-      `${getBaseUrl()}/settings?gmail_connected=true`
-    )
+    // Preservar cookies de sesión de la request original si existen
+    const redirectUrl = `${getBaseUrl()}/settings?gmail_connected=true`
+    const response = NextResponse.redirect(redirectUrl)
+    
+    // Preservar la cookie de sesión si existe en la request original
+    const sessionCookie = req.cookies.get(SESSION_COOKIE_NAME)
+    if (sessionCookie) {
+      response.cookies.set(SESSION_COOKIE_NAME, sessionCookie.value, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 86400 // 24 horas
+      })
+      console.log('[Gmail OAuth Callback] Session cookie preserved')
+    } else {
+      console.log('[Gmail OAuth Callback] No session cookie found, user will need to login')
+    }
+    
+    return response
   } catch (error) {
     console.error("Error en OAuth callback:", error)
     return NextResponse.redirect(

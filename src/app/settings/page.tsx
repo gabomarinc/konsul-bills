@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { 
+import {
   User, 
   Building2, 
   Bell, 
@@ -28,6 +28,7 @@ import {
   CreditCard,
   MessageCircle
 } from "lucide-react"
+import GmailIntegrationWizard from "@/components/konsul/GmailIntegrationWizard"
 
 
 export default function SettingsPage() {
@@ -84,8 +85,98 @@ export default function SettingsPage() {
     lastName: ""
   })
 
-  const [telegramDialogOpen, setTelegramDialogOpen] = useState(false)
-  const [telegramIdInput, setTelegramIdInput] = useState("")
+const [telegramDialogOpen, setTelegramDialogOpen] = useState(false)
+const [telegramIdInput, setTelegramIdInput] = useState("")
+
+type PendingQuote = {
+  id: string
+  emailSubject: string
+  emailFrom: string
+  emailDate: string
+  clientName?: string | null
+  clientEmail?: string | null
+  title?: string | null
+  amount?: number | null
+  currency?: string | null
+  status: string
+}
+
+const [gmailIntegration, setGmailIntegration] = useState<{
+  connected: boolean
+  email?: string
+  lastSyncAt?: string
+  pendingQuotes?: number
+}>({
+  connected: false
+})
+const [gmailWizardOpen, setGmailWizardOpen] = useState(false)
+const [pendingQuotes, setPendingQuotes] = useState<PendingQuote[]>([])
+const [loadingPending, setLoadingPending] = useState(false)
+
+const formatMoney = (amount?: number | null, currency: string = "EUR") => {
+  if (amount === undefined || amount === null) return "—"
+  try {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency
+    }).format(amount)
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`
+  }
+}
+
+const loadPendingQuotes = async () => {
+  try {
+    setLoadingPending(true)
+    const response = await fetch("/api/gmail/pending?status=pending", {
+      credentials: "include"
+    })
+    if (response.ok) {
+      const data = await response.json()
+      setPendingQuotes(data.data || [])
+    }
+  } catch (error) {
+    console.error("Error loading pending quotes:", error)
+  } finally {
+    setLoadingPending(false)
+  }
+}
+
+const handleApprovePending = async (id: string) => {
+  try {
+    const response = await fetch(`/api/gmail/pending/${id}/approve`, {
+      method: "POST",
+      credentials: "include"
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(error.error || "Error al aprobar cotización")
+      return
+    }
+    alert("Cotización creada exitosamente")
+    await loadPendingQuotes()
+  } catch (error) {
+    console.error("Error approving pending quote:", error)
+    alert("Error al crear la cotización")
+  }
+}
+
+const handleDiscardPending = async (id: string) => {
+  try {
+    const response = await fetch(`/api/gmail/pending/${id}/discard`, {
+      method: "POST",
+      credentials: "include"
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(error.error || "Error al descartar")
+      return
+    }
+    await loadPendingQuotes()
+  } catch (error) {
+    console.error("Error discarding pending quote:", error)
+  }
+}
 
 
   // Cargar datos iniciales
@@ -123,6 +214,21 @@ export default function SettingsPage() {
             defaultTaxRate: businessData.defaultTaxRate ?? 21.00,
             defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días"
           })
+        }
+
+        // Cargar estado de integración Gmail
+        const gmailResponse = await fetch("/api/gmail/status", {
+          credentials: "include"
+        })
+        if (gmailResponse.ok) {
+          const gmailData = await gmailResponse.json()
+          setGmailIntegration(gmailData)
+          setIntegrations(prev => ({ ...prev, gmail: gmailData.connected }))
+          if (gmailData.connected) {
+            await loadPendingQuotes()
+          } else {
+            setPendingQuotes([])
+          }
         }
       } catch (error) {
         console.error("Error loading settings:", error)
@@ -646,6 +752,82 @@ export default function SettingsPage() {
               </Button>
             </Card>
 
+            {gmailIntegration.connected && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Cotizaciones detectadas
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      Revisa y crea cotizaciones encontradas en tus correos
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={loadPendingQuotes}>
+                      Refrescar
+                    </Button>
+                    <Badge variant="secondary">
+                      {pendingQuotes.length} pendientes
+                    </Badge>
+                  </div>
+                </div>
+                {loadingPending ? (
+                  <div className="text-sm text-slate-500">Cargando...</div>
+                ) : pendingQuotes.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No hay cotizaciones pendientes. Te avisaremos cuando detectemos nuevas.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingQuotes.map((quote) => (
+                      <div
+                        key={quote.id}
+                        className="border border-slate-200 rounded-lg p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+                      >
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900">
+                            {quote.title || quote.emailSubject}
+                          </h4>
+                          <p className="text-sm text-slate-600">
+                            {quote.clientName || quote.emailFrom}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Recibido:{" "}
+                            {new Date(quote.emailDate).toLocaleString("es-ES")}
+                          </p>
+                        </div>
+                        <div className="text-right min-w-[140px]">
+                          <p className="font-semibold text-slate-900">
+                            {formatMoney(quote.amount, quote.currency || "EUR")}
+                          </p>
+                          <p className="text-xs text-slate-500 capitalize">
+                            {quote.status}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-2 md:mt-0">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleApprovePending(quote.id)}
+                          >
+                            Crear
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDiscardPending(quote.id)}
+                          >
+                            Descartar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-purple-100 rounded-lg">
@@ -658,28 +840,65 @@ export default function SettingsPage() {
               </div>
               
               <div className="space-y-4">
+                {/* Gmail Integration */}
                 <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">M</span>
+                      <Mail className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-medium">{t.settings.gmail}</h4>
-                      <p className="text-sm text-slate-600">{t.settings.gmailDesc}</p>
+                      <h4 className="font-medium">Gmail</h4>
+                      <p className="text-sm text-slate-600">
+                        {gmailIntegration.connected 
+                          ? `Conectado: ${gmailIntegration.email || 'Gmail'}`
+                          : "Crea cotizaciones automáticamente desde tus correos"}
+                      </p>
+                      {gmailIntegration.connected && gmailIntegration.lastSyncAt && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Última sincronización: {new Date(gmailIntegration.lastSyncAt).toLocaleString('es-ES')}
+                        </p>
+                      )}
+                      {gmailIntegration.connected && gmailIntegration.pendingQuotes !== undefined && gmailIntegration.pendingQuotes > 0 && (
+                        <p className="text-xs text-blue-600 mt-1 font-medium">
+                          {gmailIntegration.pendingQuotes} cotización(es) pendiente(s) de revisar
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant={integrations.gmail ? "default" : "secondary"}>
-                      {integrations.gmail ? t.settings.connected : t.settings.notConnected}
+                    <Badge variant={gmailIntegration.connected ? "default" : "secondary"}>
+                      {gmailIntegration.connected ? t.settings.connected : t.settings.notConnected}
                     </Badge>
-                    <Button
-                      variant={integrations.gmail ? "outline" : "default"}
-                      size="sm"
-                      onClick={() => handleIntegrationToggle("gmail")}
-                    >
-                      {integrations.gmail ? t.settings.disconnect : t.settings.connect}
-                      <ExternalLink className="h-4 w-4 ml-2" />
-                    </Button>
+                    {gmailIntegration.connected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          if (confirm("¿Estás seguro de que quieres desconectar Gmail?")) {
+                            const response = await fetch("/api/gmail/oauth/disconnect", {
+                              method: "POST",
+                              credentials: "include"
+                            })
+                            if (response.ok) {
+                              setGmailIntegration({ connected: false })
+                              setIntegrations(prev => ({ ...prev, gmail: false }))
+                              alert("Gmail desconectado exitosamente")
+                            }
+                          }
+                        }}
+                      >
+                        Desconectar
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setGmailWizardOpen(true)}
+                      >
+                        Conectar
+                        <ExternalLink className="h-4 w-4 ml-2" />
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
@@ -958,6 +1177,26 @@ export default function SettingsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Gmail Integration Wizard */}
+        <GmailIntegrationWizard
+          open={gmailWizardOpen}
+          onClose={() => {
+            setGmailWizardOpen(false)
+            // Recargar estado de Gmail después de cerrar
+            fetch("/api/gmail/status", { credentials: "include" })
+              .then(res => res.json())
+              .then(data => {
+                setGmailIntegration(data)
+                setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+              })
+          }}
+          onComplete={() => {
+            setGmailWizardOpen(false)
+            setGmailIntegration({ connected: true })
+            setIntegrations(prev => ({ ...prev, gmail: true }))
+          }}
+        />
       </div>
   )
 }

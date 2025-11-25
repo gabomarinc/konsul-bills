@@ -225,6 +225,7 @@ model User {
   Session      Session[]
   UserProfile  UserProfile?
   TelegramUser TelegramUser?
+  GmailIntegration GmailIntegration?
 }
 
 model TelegramUser {
@@ -320,4 +321,62 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model GmailIntegration {
+  id            String   @id
+  userId        String   @unique
+  accessToken   String   // Encrypted
+  refreshToken  String   // Encrypted
+  expiresAt     DateTime
+  email         String   // Email de Gmail conectado
+  isActive      Boolean  @default(true)
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  PendingQuote  PendingQuote[]
+  ProcessedEmail ProcessedEmail[]
+
+  @@index([userId, isActive])
+}
+
+model PendingQuote {
+  id              String   @id
+  userId          String
+  gmailIntegrationId String
+  emailId         String   // ID del correo de Gmail
+  emailSubject    String
+  emailFrom       String
+  emailDate       DateTime
+  emailBody       String?  // Texto del correo
+  // Datos extraídos
+  clientName      String?
+  clientEmail     String?
+  title           String?
+  amount          Float?
+  currency        String?
+  tax             Float?
+  description     String?
+  issueDate       String?
+  dueDate         String?
+  // Estado
+  status          String   @default("pending") // pending, approved, rejected
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  GmailIntegration GmailIntegration @relation(fields: [gmailIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([gmailIntegrationId, emailId])
+  @@index([userId, status])
+}
+
+model ProcessedEmail {
+  id                String   @id
+  gmailIntegrationId String
+  emailId           String   // ID del correo de Gmail
+  processedAt       DateTime @default(now())
+  GmailIntegration  GmailIntegration @relation(fields: [gmailIntegrationId], references: [id], onDelete: Cascade)
+
+  @@unique([gmailIntegrationId, emailId])
+  @@index([gmailIntegrationId, processedAt])
 }

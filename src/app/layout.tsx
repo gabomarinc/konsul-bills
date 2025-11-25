@@ -283,6 +283,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                       })
                     });
                     
+                    if (!response.ok) {
+                      const errorData = await response.json();
+                      typingDiv.remove();
+                      addMessage(errorData.message || errorData.error || 'Error al procesar el mensaje. Por favor, intenta nuevamente.', false);
+                      console.error('[ChatBot] API Error:', errorData);
+                      return;
+                    }
+                    
                     const data = await response.json();
                     typingDiv.remove();
                     addMessage(data.message || 'Lo siento, no pude procesar tu mensaje.', false);

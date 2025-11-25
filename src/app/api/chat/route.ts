@@ -23,17 +23,25 @@ interface ActionResult {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('[Chat API] Request recibido')
     const authUser = await getAuthUserFromRequest(req)
+    console.log('[Chat API] Auth user:', authUser ? 'existe' : 'no existe')
     
     if (!authUser?.userId) {
+      console.log('[Chat API] No autenticado')
       return NextResponse.json(
-        { error: "No autenticado" },
+        { error: "No autenticado", message: "Por favor, inicia sesión nuevamente." },
         { status: 401 }
       )
     }
 
+    console.log('[Chat API] Obteniendo company...')
     const company = await getUserCompanyFromRequest(req)
-    const { message, conversationHistory = [] } = await req.json()
+    console.log('[Chat API] Company obtenida:', company?.id)
+    
+    const body = await req.json()
+    const { message, conversationHistory = [] } = body
+    console.log('[Chat API] Mensaje recibido:', message?.substring(0, 50))
 
     if (!message || typeof message !== "string") {
       return NextResponse.json(
@@ -386,10 +394,14 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
       actions: executedActions
     })
   } catch (error: any) {
-    console.error("Error en chat API:", error)
+    console.error("[Chat API] Error completo:", error)
+    console.error("[Chat API] Error stack:", error?.stack)
+    console.error("[Chat API] Error message:", error?.message)
+    
     return NextResponse.json(
       { 
-        message: "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
+        message: error?.message || "Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta nuevamente.",
+        error: error?.message,
         actions: []
       },
       { status: 500 }

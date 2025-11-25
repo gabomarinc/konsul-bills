@@ -40,11 +40,19 @@ export async function GET(req: NextRequest) {
     }
 
     // Intercambiar código por tokens
+    console.log('[Gmail OAuth Callback] Exchanging code for tokens...')
     const tokens = await exchangeCodeForTokens(code)
     
     if (!tokens.access_token || !tokens.refresh_token) {
+      console.error('[Gmail OAuth Callback] Tokens missing:', {
+        hasAccessToken: !!tokens.access_token,
+        hasRefreshToken: !!tokens.refresh_token,
+        tokens: tokens
+      })
       throw new Error('Tokens no recibidos de Google')
     }
+
+    console.log('[Gmail OAuth Callback] Tokens received, fetching user info...')
 
     // Obtener información del usuario de Gmail
     const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -53,12 +61,26 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    console.log('[Gmail OAuth Callback] User info response status:', userInfoResponse.status, userInfoResponse.statusText)
+
     if (!userInfoResponse.ok) {
-      throw new Error('Error obteniendo información del usuario')
+      const errorText = await userInfoResponse.text()
+      console.error('[Gmail OAuth Callback] User info error:', {
+        status: userInfoResponse.status,
+        statusText: userInfoResponse.statusText,
+        error: errorText
+      })
+      throw new Error(`Error obteniendo información del usuario: ${userInfoResponse.status} ${userInfoResponse.statusText}`)
     }
 
     const userInfo = await userInfoResponse.json()
+    console.log('[Gmail OAuth Callback] User info received:', { email: userInfo.email, id: userInfo.id })
     const email = userInfo.email
+    
+    if (!email) {
+      console.error('[Gmail OAuth Callback] Email not found in user info:', userInfo)
+      throw new Error('Email no encontrado en la información del usuario')
+    }
 
     // Calcular fecha de expiración
     const expiresAt = new Date()

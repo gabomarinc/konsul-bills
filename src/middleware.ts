@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 import { verifyToken, SESSION_COOKIE_NAME } from "./lib/jwt"
 
 // Rutas públicas que no requieren autenticación
-const publicRoutes = ['/auth/signin', '/auth/signup', '/api/auth/login', '/api/auth/register', '/api/stripe/webhook', '/api/cron', '/api/gmail/oauth']
+const publicRoutes = ['/auth/signin', '/auth/signup', '/api/auth/login', '/api/auth/register', '/api/stripe/webhook', '/api/cron', '/api/gmail/oauth', '/api/gemini/test']
 
 // Rutas de API que requieren autenticación
 const protectedApiRoutes = ['/api/invoices', '/api/quotes', '/api/profile', '/api/ai', '/api/settings', '/api/chat']

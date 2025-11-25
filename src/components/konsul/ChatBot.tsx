@@ -33,7 +33,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   ])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(true) // Iniciar minimizado para que sea más discreto
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -131,10 +131,11 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
 
   if (isMinimized) {
     return (
-      <div className={`fixed bottom-4 right-4 z-50 ${className}`}>
+      <div className={`fixed bottom-4 right-4 z-[9999] ${className}`} style={{ position: 'fixed' }}>
         <Button
           onClick={() => setIsMinimized(false)}
           className="rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+          aria-label="Abrir asistente de IA"
         >
           <Bot className="h-6 w-6 text-white" />
         </Button>
@@ -143,7 +144,10 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   }
 
   return (
-    <div className={`fixed bottom-4 right-4 z-50 w-96 max-w-[calc(100vw-2rem)] ${className}`}>
+    <div 
+      className={`fixed bottom-4 right-4 z-[9999] w-96 max-w-[calc(100vw-2rem)] ${className}`}
+      style={{ position: 'fixed' }}
+    >
       <Card className="flex flex-col h-[600px] shadow-2xl border-2">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-lg">

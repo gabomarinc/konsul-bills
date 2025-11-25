@@ -320,13 +320,24 @@ Usuario dice: "${message}"
 
 IMPORTANTE: Mantén el contexto de la conversación anterior. Si el usuario está respondiendo a una pregunta tuya, usa la información previa para completar la acción.
 
-Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crear algo y ya tienes toda la información necesaria (cliente, monto, descripción), extrae la información y responde en formato JSON:
+INSTRUCCIONES CRÍTICAS:
+1. Si el usuario quiere crear algo y ya tienes TODA la información necesaria (cliente, monto, descripción/título), DEBES responder SOLO con un JSON válido, sin texto adicional antes o después.
+
+2. El formato del JSON DEBE ser exactamente:
 {
-  "message": "tu respuesta",
-  "function_calls": [{"name": "funcion", "arguments": {...}}]
+  "message": "tu respuesta amigable al usuario",
+  "function_calls": [{"name": "create_quote", "arguments": {"clientName": "...", "amount": ..., "description": "...", "currency": "USD"}}]
 }
 
-Si aún falta información, pregunta de forma amigable qué falta.`
+3. Si falta información, responde de forma conversacional (sin JSON) preguntando qué falta.
+
+4. Cuando tengas toda la información y vayas a crear la cotización, responde SOLO con el JSON, sin texto adicional.
+
+Ejemplo de respuesta cuando tienes toda la info:
+{
+  "message": "¡Perfecto! Estoy creando la cotización para Cranealo por $650 para Sitio Web. ¡Un momento!",
+  "function_calls": [{"name": "create_quote", "arguments": {"clientName": "Cranealo", "amount": 650, "description": "Sitio Web", "currency": "USD"}}]
+}`
 
       // Usar gemini-2.5-flash que está disponible (gemini-1.5-flash ya no existe)
       console.log('[Chat API] Usando gemini-2.5-flash')

@@ -299,16 +299,34 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
       }
     } else if (GEMINI_API_KEY) {
       console.log('[Chat API] Usando Gemini')
-      // Simplificar: usar prompt directo sin function calling por ahora
-      const fullPrompt = `${systemPrompt}
+      console.log('[Chat API] Historial de conversación:', conversationHistory.length, 'mensajes')
+      
+      // Construir historial de conversación para contexto
+      let historyContext = ''
+      if (conversationHistory && conversationHistory.length > 0) {
+        historyContext = '\n\nHistorial de la conversación:\n'
+        conversationHistory.slice(-10).forEach((msg: any) => {
+          if (msg.role === 'user') {
+            historyContext += `Usuario: ${msg.content}\n`
+          } else if (msg.role === 'assistant') {
+            historyContext += `Asistente: ${msg.content}\n`
+          }
+        })
+      }
+      
+      const fullPrompt = `${systemPrompt}${historyContext}
 
 Usuario dice: "${message}"
 
-Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crear algo, extrae la información y responde en formato JSON:
+IMPORTANTE: Mantén el contexto de la conversación anterior. Si el usuario está respondiendo a una pregunta tuya, usa la información previa para completar la acción.
+
+Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crear algo y ya tienes toda la información necesaria (cliente, monto, descripción), extrae la información y responde en formato JSON:
 {
   "message": "tu respuesta",
   "function_calls": [{"name": "funcion", "arguments": {...}}]
-}`
+}
+
+Si aún falta información, pregunta de forma amigable qué falta.`
 
       // Usar gemini-2.5-flash que está disponible (gemini-1.5-flash ya no existe)
       console.log('[Chat API] Usando gemini-2.5-flash')

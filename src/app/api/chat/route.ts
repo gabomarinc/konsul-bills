@@ -310,10 +310,10 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
   "function_calls": [{"name": "funcion", "arguments": {...}}]
 }`
 
-      // Usar EXACTAMENTE el mismo formato que funciona en gemini.ts
-      console.log('[Chat API] Usando gemini-1.5-flash (mismo formato que gemini.ts)')
+      // Usar gemini-2.5-flash que está disponible (gemini-1.5-flash ya no existe)
+      console.log('[Chat API] Usando gemini-2.5-flash')
       const response = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
           GEMINI_API_KEY,
         {
           method: "POST",
@@ -360,7 +360,7 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
         data?.candidates?.[0]?.output ||
         ""
       
-      console.log('[Chat API] Respuesta recibida de gemini-1.5-flash:', text.substring(0, 100))
+      console.log('[Chat API] Respuesta recibida de gemini-2.5-flash:', text.substring(0, 100))
       
       try {
         const parsed = JSON.parse(text.replace(/```json\n?/g, "").replace(/```/g, ""))

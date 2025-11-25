@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -34,8 +35,13 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [isMinimized, setIsMinimized] = useState(true) // Iniciar minimizado para que sea más discreto
+  const [mounted, setMounted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -129,21 +135,21 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
     }
   }
 
-  if (isMinimized) {
-    return (
-      <div className={`fixed bottom-4 right-4 z-[9999] ${className}`} style={{ position: 'fixed' }}>
-        <Button
-          onClick={() => setIsMinimized(false)}
-          className="rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700"
-          aria-label="Abrir asistente de IA"
-        >
-          <Bot className="h-6 w-6 text-white" />
-        </Button>
-      </div>
-    )
+  if (!mounted) {
+    return null
   }
 
-  return (
+  const chatbotContent = isMinimized ? (
+    <div className={`fixed bottom-4 right-4 z-[9999] ${className}`} style={{ position: 'fixed' }}>
+      <Button
+        onClick={() => setIsMinimized(false)}
+        className="rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700"
+        aria-label="Abrir asistente de IA"
+      >
+        <Bot className="h-6 w-6 text-white" />
+      </Button>
+    </div>
+  ) : (
     <div 
       className={`fixed bottom-4 right-4 z-[9999] w-96 max-w-[calc(100vw-2rem)] ${className}`}
       style={{ position: 'fixed' }}
@@ -258,5 +264,12 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
       </Card>
     </div>
   )
+
+  // Renderizar usando portal para asegurar que esté fuera del árbol DOM normal
+  if (typeof window !== 'undefined') {
+    return createPortal(chatbotContent, document.body)
+  }
+  
+  return null
 }
 

@@ -144,7 +144,10 @@ export default function AuthenticatedLayout({
       </div>
 
       {/* ChatBot */}
-      {user && <ChatBot />}
+      {user && (() => {
+        console.log('[AuthenticatedLayout] Rendering ChatBot, user:', user?.email)
+        return <ChatBot />
+      })()}
     </div>
   )
 }

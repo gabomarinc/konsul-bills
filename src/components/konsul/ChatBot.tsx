@@ -24,6 +24,8 @@ interface ChatBotProps {
 }
 
 export default function ChatBot({ className = "" }: ChatBotProps) {
+  console.log('[ChatBot] Component function called')
+  
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -40,8 +42,8 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    console.log('[ChatBot] useEffect - setting mounted to true')
     setMounted(true)
-    console.log('[ChatBot] Component mounted')
   }, [])
 
   const scrollToBottom = () => {

@@ -9,12 +9,16 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 
+console.log('[AuthenticatedLayout] Module loaded, ChatBot imported:', typeof ChatBot)
+
 export default function AuthenticatedLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  console.log('[AuthenticatedLayout] ========== COMPONENT RENDERED ==========')
   const { user, isLoading } = useAuth()
+  console.log('[AuthenticatedLayout] User state:', { user: !!user, isLoading, userEmail: user?.email })
   const { t } = useTranslation()
   const router = useRouter()
   const pathname = usePathname()

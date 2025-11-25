@@ -24,12 +24,26 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  if (typeof window !== 'undefined') {
+    console.log('[RootLayout] ========== ROOT LAYOUT RENDERED ==========')
+  }
+  
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50 text-gray-900`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              console.log('[RootLayout] Script tag executed');
+              window.addEventListener('DOMContentLoaded', () => {
+                console.log('[RootLayout] DOM Content Loaded');
+              });
+            `,
+          }}
+        />
         <QueryProvider>
           <LanguageProvider>
             <AuthProvider>

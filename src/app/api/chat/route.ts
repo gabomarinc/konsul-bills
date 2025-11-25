@@ -307,8 +307,9 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
         }))
       }]
 
+      // Usar v1 en lugar de v1beta para gemini-1.5-flash
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

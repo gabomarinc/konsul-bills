@@ -272,12 +272,23 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   )
 
   // Renderizar usando portal para asegurar que esté fuera del árbol DOM normal
-  if (typeof window !== 'undefined' && document.body) {
-    console.log('[ChatBot] Rendering via portal to document.body')
-    return createPortal(chatbotContent, document.body)
+  if (typeof window !== 'undefined') {
+    if (document.body) {
+      console.log('[ChatBot] Rendering via portal to document.body')
+      try {
+        return createPortal(chatbotContent, document.body)
+      } catch (error) {
+        console.error('[ChatBot] Error creating portal:', error)
+        // Fallback: renderizar sin portal
+        return chatbotContent
+      }
+    } else {
+      console.log('[ChatBot] document.body not available yet')
+      return null
+    }
   }
   
-  console.log('[ChatBot] Window or document.body not available')
+  console.log('[ChatBot] Window not available (SSR)')
   return null
 }
 

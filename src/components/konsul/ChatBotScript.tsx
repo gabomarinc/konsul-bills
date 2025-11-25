@@ -191,7 +191,7 @@ export default function ChatBotScript() {
                   
                   // Disparar evento para actualizar la lista de cotizaciones
                   if (actions.some((a: any) => a.type === 'quote_created' || a.type === 'invoice_created')) {
-                    if (typeof window !== 'undefined') {
+                    if (typeof window !== 'undefined' && window !== null) {
                       window.dispatchEvent(new CustomEvent('quoteCreated'))
                     }
                   }

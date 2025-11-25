@@ -314,58 +314,31 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
       let response: Response | null = null
       let lastError: string = ''
       
-      // Usar el mismo formato que funciona en gemini.ts
-      try {
-        console.log('[Chat API] Intentando con gemini-1.5-flash (mismo formato que gemini.ts)')
-        response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
+      // Usar EXACTAMENTE el mismo formato que funciona en gemini.ts
+      console.log('[Chat API] Usando gemini-1.5-flash (mismo formato que gemini.ts)')
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
+          GEMINI_API_KEY,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
                 parts: [{ text: fullPrompt }]
-              }],
-              generationConfig: { 
-                temperature: 0.7
               }
-            })
-          }
-        )
-        
-        if (response.ok) {
-          console.log('[Chat API] gemini-1.5-flash funcionó')
-        } else {
-          const errorText = await response.text()
-          lastError = errorText
-          console.log('[Chat API] gemini-1.5-flash falló, intentando gemini-pro')
-          
-          // Fallback a gemini-pro
-          response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{ text: fullPrompt }]
-                }],
-                generationConfig: { 
-                  temperature: 0.7
-                }
-              })
-            }
-          )
+            ]
+          })
         }
-      } catch (error: any) {
-        console.error('[Chat API] Error con Gemini:', error)
-        lastError = error.message
-      }
+      )
 
-      if (!response || !response.ok) {
-        const errorText = lastError || await response?.text() || 'Unknown error'
-        console.error('[Chat API] Todos los modelos de Gemini fallaron:', errorText)
-        throw new Error(`Gemini API error: ${response?.statusText || 'Unknown'} - ${errorText}`)
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[Chat API] Error de Gemini:', errorText)
+        throw new Error(`Gemini API error: ${response.statusText} - ${errorText}`)
       }
 
       const data = await response.json()

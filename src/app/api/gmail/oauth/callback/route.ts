@@ -10,16 +10,21 @@ export async function GET(req: NextRequest) {
     const state = searchParams.get('state') // userId
     const error = searchParams.get('error')
 
+    // Determinar URL base para redirecciones
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'https://konsul-bills.vercel.app'
+
     // Si hay error de Google
     if (error) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?gmail_error=${error}`
+        `${baseUrl}/settings?gmail_error=${error}`
       )
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?gmail_error=missing_params`
+        `${baseUrl}/settings?gmail_error=missing_params`
       )
     }
 
@@ -74,14 +79,22 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // Determinar URL base para redirecciones
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'https://konsul-bills.vercel.app'
+
     // Redirigir a settings con éxito
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?gmail_connected=true`
+      `${baseUrl}/settings?gmail_connected=true`
     )
   } catch (error) {
     console.error("Error en OAuth callback:", error)
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    'https://konsul-bills.vercel.app'
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/settings?gmail_error=callback_failed`
+      `${baseUrl}/settings?gmail_error=callback_failed`
     )
   }
 }

@@ -3,7 +3,7 @@
 import { useAuth } from "@/contexts/AuthContext"
 import { useTranslation } from "@/contexts/LanguageContext"
 import Topbar from "@/components/konsul/Topbar"
-import ChatBot from "@/components/konsul/ChatBot"
+import ChatBotSimple from "@/components/konsul/ChatBotSimple"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -147,8 +147,8 @@ export default function AuthenticatedLayout({
         <main className="p-6 overflow-y-auto">{children}</main>
       </div>
 
-      {/* ChatBot - SIEMPRE renderizar para debug */}
-      <ChatBot />
+      {/* ChatBot Simple - Versión simplificada */}
+      <ChatBotSimple />
     </div>
   )
 }

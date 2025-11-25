@@ -360,15 +360,40 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
         data?.candidates?.[0]?.output ||
         ""
       
-      console.log('[Chat API] Respuesta recibida de gemini-2.5-flash:', text.substring(0, 100))
+      console.log('[Chat API] Respuesta recibida de gemini-2.5-flash:', text.substring(0, 500))
       
-      try {
-        const parsed = JSON.parse(text.replace(/```json\n?/g, "").replace(/```/g, ""))
+      // Intentar extraer JSON del texto (puede estar en un bloque de código o mezclado con texto)
+      let parsed: any = null
+      let extractedJson: string | null = null
+      
+      // Buscar JSON en bloques de código
+      const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/```\s*([\s\S]*?)```/)
+      if (jsonBlockMatch) {
+        extractedJson = jsonBlockMatch[1].trim()
+      } else {
+        // Buscar JSON directamente (entre llaves)
+        const jsonMatch = text.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          extractedJson = jsonMatch[0]
+        }
+      }
+      
+      if (extractedJson) {
+        try {
+          parsed = JSON.parse(extractedJson)
+          console.log('[Chat API] JSON extraído y parseado:', parsed)
+        } catch (parseError) {
+          console.warn('[Chat API] Error al parsear JSON extraído:', parseError)
+        }
+      }
+      
+      if (parsed && parsed.message) {
         aiResponse = { message: { content: parsed.message }, function_calls: parsed.function_calls || [] }
         functionCalls = parsed.function_calls || []
-      } catch (parseError) {
-        // Si no se puede parsear, usar el texto directamente
-        console.warn('[Chat API] No se pudo parsear respuesta de Gemini como JSON, usando texto plano')
+        console.log('[Chat API] Function calls encontrados:', functionCalls.length)
+      } else {
+        // Si no se pudo parsear, usar el texto directamente
+        console.warn('[Chat API] No se encontró JSON válido, usando texto plano')
         aiResponse = { message: { content: text } }
         functionCalls = []
       }
@@ -380,18 +405,23 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
     }
 
     // Ejecutar function calls
+    console.log('[Chat API] Ejecutando function calls:', functionCalls.length)
     for (const funcCall of functionCalls) {
       try {
+        console.log('[Chat API] Procesando function call:', funcCall.name, 'con arguments:', funcCall.arguments)
         const args = typeof funcCall.arguments === "string" 
           ? JSON.parse(funcCall.arguments) 
           : funcCall.arguments
 
+        console.log('[Chat API] Arguments parseados:', args)
         const result = await executeFunction(funcCall.name, args, company.id, authUser.userId)
+        console.log('[Chat API] Resultado de executeFunction:', result)
         if (result) {
           executedActions.push(result)
         }
       } catch (error: any) {
-        console.error(`Error ejecutando función ${funcCall.name}:`, error)
+        console.error(`[Chat API] Error ejecutando función ${funcCall.name}:`, error)
+        console.error(`[Chat API] Error stack:`, error?.stack)
         executedActions.push({
           type: "error",
           data: { message: `Error al ejecutar ${funcCall.name}: ${error.message}` }
@@ -454,6 +484,8 @@ async function executeFunction(
 
   switch (functionName) {
     case "create_quote": {
+      console.log('[Chat API] create_quote - args recibidos:', args)
+      
       // Crear o buscar cliente
       let clientId: string
       const client = await prisma.client.upsert({
@@ -468,13 +500,25 @@ async function executeFunction(
         }
       })
       clientId = client.id
+      console.log('[Chat API] create_quote - cliente encontrado/creado:', clientId)
+
+      // Si viene amount y description, crear un item automáticamente
+      let items = args.items || []
+      if (!items.length && args.amount) {
+        items = [{
+          description: args.description || args.title || "Servicio",
+          qty: 1,
+          price: parseFloat(args.amount)
+        }]
+        console.log('[Chat API] create_quote - items creados desde amount:', items)
+      }
 
       // Calcular totales
-      const items = args.items || []
       const tax = args.tax ?? settings?.defaultTaxRate ?? 21
       const subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.price), 0)
       const taxAmount = (subtotal * tax) / 100
       const total = Math.round((subtotal + taxAmount) * 100) / 100
+      console.log('[Chat API] create_quote - totales calculados:', { subtotal, taxAmount, total })
 
       // Crear cotización
       const quoteId = await nextHumanId({
@@ -489,7 +533,7 @@ async function executeFunction(
           id: quoteId,
           companyId,
           clientId,
-          title: args.title || "Cotización",
+          title: args.title || args.description || "Cotización",
           issueDate: new Date(),
           currency: args.currency || settings?.defaultCurrency || "EUR",
           tax,
@@ -500,6 +544,7 @@ async function executeFunction(
           updatedAt: new Date()
         }
       })
+      console.log('[Chat API] create_quote - cotización creada:', quote.id)
 
       // Crear items
       for (const item of items) {
@@ -508,11 +553,12 @@ async function executeFunction(
             id: `item_${nanoid(16)}`,
             quoteId: quote.id,
             description: item.description,
-            qty: item.qty,
+            qty: item.qty || 1,
             price: item.price
           }
         })
       }
+      console.log('[Chat API] create_quote - items creados:', items.length)
 
       // Enviar email si se solicita
       if (args.sendEmail && client.email) {

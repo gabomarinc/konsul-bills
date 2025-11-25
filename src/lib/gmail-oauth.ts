@@ -5,7 +5,9 @@ import { generateId } from "./db"
  */
 
 export const GMAIL_SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly"
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile"
 ].join(" ")
 
 function resolveRedirectUri() {

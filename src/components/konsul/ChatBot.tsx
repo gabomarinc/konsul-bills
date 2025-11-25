@@ -136,12 +136,12 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
     }
   }
 
+  console.log('[ChatBot] Render - mounted:', mounted, 'isMinimized:', isMinimized)
+
   if (!mounted) {
     console.log('[ChatBot] Not mounted yet, returning null')
     return null
   }
-
-  console.log('[ChatBot] Rendering chatbot, isMinimized:', isMinimized)
 
   const chatbotContent = isMinimized ? (
     <div className={`fixed bottom-4 right-4 z-[9999] ${className}`} style={{ position: 'fixed' }}>

@@ -22,14 +22,18 @@ export async function GET(req: NextRequest) {
 
     const baseUrl = getBaseUrl()
 
+    console.log('[Gmail OAuth Callback]', { code: code ? 'present' : 'missing', state, error })
+
     // Si hay error de Google
     if (error) {
+      console.error('[Gmail OAuth Callback] Error from Google:', error)
       return NextResponse.redirect(
         `${baseUrl}/settings?gmail_error=${error}`
       )
     }
 
     if (!code || !state) {
+      console.error('[Gmail OAuth Callback] Missing params:', { code: !!code, state: !!state })
       return NextResponse.redirect(
         `${baseUrl}/settings?gmail_error=missing_params`
       )
@@ -62,6 +66,8 @@ export async function GET(req: NextRequest) {
 
     // Guardar o actualizar integración en BD
     const userId = state
+    console.log('[Gmail OAuth Callback] Saving integration for userId:', userId)
+    
     await prisma.gmailIntegration.upsert({
       where: { userId },
       update: {
@@ -85,6 +91,8 @@ export async function GET(req: NextRequest) {
         updatedAt: new Date()
       }
     })
+
+    console.log('[Gmail OAuth Callback] Integration saved successfully for userId:', userId)
 
     // Redirigir a settings con éxito
     return NextResponse.redirect(

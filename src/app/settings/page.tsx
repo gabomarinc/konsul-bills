@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
 import { useTranslation } from "@/contexts/LanguageContext"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,13 +27,17 @@ import {
   AlertTriangle,
   ExternalLink,
   CreditCard,
-  MessageCircle
+  MessageCircle,
+  CheckCircle2
 } from "lucide-react"
+import { toast } from "sonner"
 import GmailIntegrationWizard from "@/components/konsul/GmailIntegrationWizard"
 
 
 export default function SettingsPage() {
   const { t } = useTranslation()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [profileSettings, setProfileSettings] = useState({
     firstName: "",
     lastName: "",
@@ -239,6 +244,54 @@ const handleDiscardPending = async (id: string) => {
 
     loadSettings()
   }, [])
+
+  // Manejar notificaciones de conexión de Gmail
+  useEffect(() => {
+    const gmailConnected = searchParams.get('gmail_connected')
+    const gmailError = searchParams.get('gmail_error')
+
+    if (gmailConnected === 'true') {
+      toast.success("✅ Gmail conectado exitosamente", {
+        description: "La integración con Gmail está activa. Ahora recibirás cotizaciones automáticamente desde tus correos.",
+        duration: 5000
+      })
+      // Recargar estado de Gmail
+      fetch("/api/gmail/status", { credentials: "include" })
+        .then(res => res.json())
+        .then(data => {
+          setGmailIntegration(data)
+          setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+          if (data.connected) {
+            loadPendingQuotes()
+          }
+        })
+      // Limpiar query param
+      router.replace('/settings')
+    }
+
+    if (gmailError) {
+      let errorMessage = "Error al conectar Gmail"
+      switch (gmailError) {
+        case 'access_denied':
+          errorMessage = "Acceso denegado. Por favor, autoriza el acceso a Gmail."
+          break
+        case 'missing_params':
+          errorMessage = "Faltan parámetros en la respuesta de Google."
+          break
+        case 'callback_failed':
+          errorMessage = "Error al procesar la conexión. Por favor, intenta nuevamente."
+          break
+        default:
+          errorMessage = `Error: ${gmailError}`
+      }
+      toast.error("❌ Error al conectar Gmail", {
+        description: errorMessage,
+        duration: 5000
+      })
+      // Limpiar query param
+      router.replace('/settings')
+    }
+  }, [searchParams, router])
 
   const handleProfileUpdate = async () => {
     try {
@@ -841,13 +894,31 @@ const handleDiscardPending = async (id: string) => {
               
               <div className="space-y-4">
                 {/* Gmail Integration */}
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                <div className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                  gmailIntegration.connected 
+                    ? 'border-green-200 bg-green-50/50' 
+                    : 'border-slate-200'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                      <Mail className="h-5 w-5 text-white" />
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      gmailIntegration.connected ? 'bg-green-500' : 'bg-red-500'
+                    }`}>
+                      {gmailIntegration.connected ? (
+                        <CheckCircle2 className="h-5 w-5 text-white" />
+                      ) : (
+                        <Mail className="h-5 w-5 text-white" />
+                      )}
                     </div>
                     <div>
-                      <h4 className="font-medium">Gmail</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">Gmail</h4>
+                        {gmailIntegration.connected && (
+                          <Badge className="bg-green-600 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Activo
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-slate-600">
                         {gmailIntegration.connected 
                           ? `Conectado: ${gmailIntegration.email || 'Gmail'}`
@@ -859,15 +930,25 @@ const handleDiscardPending = async (id: string) => {
                         </p>
                       )}
                       {gmailIntegration.connected && gmailIntegration.pendingQuotes !== undefined && gmailIntegration.pendingQuotes > 0 && (
-                        <p className="text-xs text-blue-600 mt-1 font-medium">
+                        <p className="text-xs text-blue-600 mt-1 font-medium flex items-center gap-1">
+                          <Bell className="h-3 w-3" />
                           {gmailIntegration.pendingQuotes} cotización(es) pendiente(s) de revisar
                         </p>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant={gmailIntegration.connected ? "default" : "secondary"}>
-                      {gmailIntegration.connected ? t.settings.connected : t.settings.notConnected}
+                    <Badge variant={gmailIntegration.connected ? "default" : "secondary"} className={
+                      gmailIntegration.connected ? "bg-green-600 text-white" : ""
+                    }>
+                      {gmailIntegration.connected ? (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {t.settings.connected}
+                        </span>
+                      ) : (
+                        t.settings.notConnected
+                      )}
                     </Badge>
                     {gmailIntegration.connected ? (
                       <Button

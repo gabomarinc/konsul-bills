@@ -68,10 +68,12 @@ export default function InvoicesPage() {
   // Escuchar eventos de creación de facturas desde el chatbot
   useEffect(() => {
     const handleInvoiceCreated = () => {
+      console.log('[InvoicesPage] Evento invoiceCreated recibido')
       invalidateInvoices()
       toast.success("Factura creada exitosamente")
     }
     
+    console.log('[InvoicesPage] Registrando listener para invoiceCreated')
     window.addEventListener('invoiceCreated', handleInvoiceCreated)
     return () => {
       window.removeEventListener('invoiceCreated', handleInvoiceCreated)

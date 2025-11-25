@@ -186,18 +186,20 @@ export default function ChatBotScript() {
                 return null
               }).filter(Boolean)
               if (actionMessages.length > 0) {
+                // Disparar eventos inmediatamente para actualizar las listas
+                if (typeof window !== 'undefined' && window) {
+                  if (actions.some((a: any) => a.type === 'quote_created')) {
+                    console.log('[ChatBot] Disparando evento quoteCreated')
+                    window.dispatchEvent(new CustomEvent('quoteCreated'))
+                  }
+                  if (actions.some((a: any) => a.type === 'invoice_created')) {
+                    console.log('[ChatBot] Disparando evento invoiceCreated')
+                    window.dispatchEvent(new CustomEvent('invoiceCreated'))
+                  }
+                }
+                
                 setTimeout(() => {
                   addMessage(actionMessages.join('\\n'), false)
-                  
-                  // Disparar eventos para actualizar las listas
-                  if (typeof window !== 'undefined' && window) {
-                    if (actions.some((a: any) => a.type === 'quote_created')) {
-                      window.dispatchEvent(new CustomEvent('quoteCreated'))
-                    }
-                    if (actions.some((a: any) => a.type === 'invoice_created')) {
-                      window.dispatchEvent(new CustomEvent('invoiceCreated'))
-                    }
-                  }
                 }, 500)
               }
             }

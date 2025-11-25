@@ -66,9 +66,9 @@ export async function GET(req: NextRequest) {
 
     // Guardar o actualizar integración en BD
     const userId = state
-    console.log('[Gmail OAuth Callback] Saving integration for userId:', userId)
+    console.log('[Gmail OAuth Callback] Saving integration for userId:', userId, 'email:', email)
     
-    await prisma.gmailIntegration.upsert({
+    const integration = await prisma.gmailIntegration.upsert({
       where: { userId },
       update: {
         accessToken: encryptToken(tokens.access_token),
@@ -92,7 +92,18 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    console.log('[Gmail OAuth Callback] Integration saved successfully for userId:', userId)
+    console.log('[Gmail OAuth Callback] Integration saved successfully:', {
+      id: integration.id,
+      userId: integration.userId,
+      email: integration.email,
+      isActive: integration.isActive
+    })
+    
+    // Verificar que se guardó correctamente
+    const verify = await prisma.gmailIntegration.findUnique({
+      where: { userId }
+    })
+    console.log('[Gmail OAuth Callback] Verification query result:', verify ? 'Found' : 'NOT FOUND')
 
     // Redirigir a settings con éxito
     return NextResponse.redirect(

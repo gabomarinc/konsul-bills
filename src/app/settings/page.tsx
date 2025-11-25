@@ -255,16 +255,37 @@ const handleDiscardPending = async (id: string) => {
         description: "La integración con Gmail está activa. Ahora recibirás cotizaciones automáticamente desde tus correos.",
         duration: 5000
       })
-      // Recargar estado de Gmail
-      fetch("/api/gmail/status", { credentials: "include" })
-        .then(res => res.json())
-        .then(data => {
-          setGmailIntegration(data)
-          setIntegrations(prev => ({ ...prev, gmail: data.connected }))
-          if (data.connected) {
-            loadPendingQuotes()
-          }
-        })
+      // Recargar estado de Gmail con un pequeño delay para asegurar que se guardó
+      setTimeout(() => {
+        fetch("/api/gmail/status", { credentials: "include" })
+          .then(res => {
+            if (!res.ok) {
+              console.error("Error fetching Gmail status:", res.status)
+              return { connected: false }
+            }
+            return res.json()
+          })
+          .then(data => {
+            console.log("Gmail status after connection:", data)
+            setGmailIntegration(data)
+            setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+            if (data.connected) {
+              loadPendingQuotes()
+            } else {
+              toast.warning("⚠️ La conexión se completó pero no se detectó en el sistema", {
+                description: "Por favor, recarga la página o intenta conectar nuevamente.",
+                duration: 5000
+              })
+            }
+          })
+          .catch(error => {
+            console.error("Error loading Gmail status:", error)
+            toast.error("Error al verificar el estado de Gmail", {
+              description: "Por favor, recarga la página.",
+              duration: 5000
+            })
+          })
+      }, 1000)
       // Limpiar query param
       router.replace('/settings')
     }
@@ -950,40 +971,75 @@ const handleDiscardPending = async (id: string) => {
                         t.settings.notConnected
                       )}
                     </Badge>
-                    {gmailIntegration.connected ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          if (confirm("¿Estás seguro de que quieres desconectar Gmail?")) {
-                            const response = await fetch("/api/gmail/oauth/disconnect", {
-                              method: "POST",
-                              credentials: "include"
-                            })
-                            if (response.ok) {
-                              setGmailIntegration({ connected: false })
-                              setIntegrations(prev => ({ ...prev, gmail: false }))
-                              alert("Gmail desconectado exitosamente")
+                    <div className="flex items-center gap-2">
+                      {gmailIntegration.connected && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            // Recargar estado manualmente
+                            try {
+                              const response = await fetch("/api/gmail/status", {
+                                credentials: "include"
+                              })
+                              if (response.ok) {
+                                const data = await response.json()
+                                setGmailIntegration(data)
+                                setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+                                if (data.connected) {
+                                  await loadPendingQuotes()
+                                  toast.success("Estado de Gmail actualizado")
+                                } else {
+                                  toast.warning("Gmail no está conectado")
+                                }
+                              }
+                            } catch (error) {
+                              console.error("Error reloading Gmail status:", error)
+                              toast.error("Error al recargar el estado")
                             }
-                          }
-                        }}
-                      >
-                        Desconectar
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          console.log("Click en Conectar, abriendo wizard...")
-                          setGmailWizardOpen(true)
-                          console.log("gmailWizardOpen debería ser true ahora")
-                        }}
-                      >
-                        Conectar
-                        <ExternalLink className="h-4 w-4 ml-2" />
-                      </Button>
-                    )}
+                          }}
+                          title="Recargar estado de Gmail"
+                        >
+                          🔄
+                        </Button>
+                      )}
+                      {gmailIntegration.connected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (confirm("¿Estás seguro de que quieres desconectar Gmail?")) {
+                              const response = await fetch("/api/gmail/oauth/disconnect", {
+                                method: "POST",
+                                credentials: "include"
+                              })
+                              if (response.ok) {
+                                setGmailIntegration({ connected: false })
+                                setIntegrations(prev => ({ ...prev, gmail: false }))
+                                toast.success("Gmail desconectado exitosamente")
+                              } else {
+                                toast.error("Error al desconectar Gmail")
+                              }
+                            }
+                          }}
+                        >
+                          Desconectar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            console.log("Click en Conectar, abriendo wizard...")
+                            setGmailWizardOpen(true)
+                            console.log("gmailWizardOpen debería ser true ahora")
+                          }}
+                        >
+                          Conectar
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 

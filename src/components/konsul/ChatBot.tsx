@@ -41,6 +41,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
 
   useEffect(() => {
     setMounted(true)
+    console.log('[ChatBot] Component mounted')
   }, [])
 
   const scrollToBottom = () => {
@@ -136,8 +137,11 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   }
 
   if (!mounted) {
+    console.log('[ChatBot] Not mounted yet, returning null')
     return null
   }
+
+  console.log('[ChatBot] Rendering chatbot, isMinimized:', isMinimized)
 
   const chatbotContent = isMinimized ? (
     <div className={`fixed bottom-4 right-4 z-[9999] ${className}`} style={{ position: 'fixed' }}>
@@ -266,10 +270,12 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   )
 
   // Renderizar usando portal para asegurar que esté fuera del árbol DOM normal
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && document.body) {
+    console.log('[ChatBot] Rendering via portal to document.body')
     return createPortal(chatbotContent, document.body)
   }
   
+  console.log('[ChatBot] Window or document.body not available')
   return null
 }
 

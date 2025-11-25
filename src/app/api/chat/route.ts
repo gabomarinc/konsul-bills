@@ -328,8 +328,7 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
               parts: [{ text: fullPrompt }]
             }],
             generationConfig: { 
-              temperature: 0.7,
-              responseMimeType: "application/json"
+              temperature: 0.7
             }
           })
         }

@@ -230,6 +230,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   console.log('[ChatBot] Chat toggled, visible:', !isVisible);
                 }
                 
+                // Mantener historial de conversación
+                let conversationHistory = [];
+                
                 function addMessage(text, isUser) {
                   const messageDiv = document.createElement('div');
                   messageDiv.style.marginBottom = '12px';
@@ -248,6 +251,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   messageDiv.appendChild(bubble);
                   messages.appendChild(messageDiv);
                   messages.scrollTop = messages.scrollHeight;
+                  
+                  // Agregar al historial
+                  conversationHistory.push({
+                    role: isUser ? 'user' : 'assistant',
+                    content: text
+                  });
+                  
+                  // Mantener solo los últimos 20 mensajes para no sobrecargar
+                  if (conversationHistory.length > 20) {
+                    conversationHistory = conversationHistory.slice(-20);
+                  }
                 }
                 
                 async function sendMessage() {
@@ -273,13 +287,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   messages.scrollTop = messages.scrollHeight;
                   
                   try {
+                    // Enviar historial completo (sin el mensaje actual que ya se agregó)
+                    const historyToSend = conversationHistory.slice(0, -1);
+                    
                     const response = await fetch('/api/chat', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       credentials: 'include',
                       body: JSON.stringify({
                         message: text,
-                        conversationHistory: []
+                        conversationHistory: historyToSend
                       })
                     });
                     
@@ -293,7 +310,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     
                     const data = await response.json();
                     typingDiv.remove();
-                    addMessage(data.message || 'Lo siento, no pude procesar tu mensaje.', false);
+                    const responseText = data.message || 'Lo siento, no pude procesar tu mensaje.';
+                    addMessage(responseText, false);
+                    
+                    // Si hay acciones ejecutadas, mostrarlas también
+                    if (data.actions && data.actions.length > 0) {
+                      const actions = data.actions.filter(a => a.type !== 'error');
+                      if (actions.length > 0) {
+                        const actionMessages = actions.map(a => {
+                          if (a.type === 'quote_created') return '✅ Cotización ' + a.data.id + ' creada';
+                          if (a.type === 'invoice_created') return '✅ Factura ' + a.data.id + ' creada';
+                          if (a.type === 'status_updated') return '✅ Estado actualizado';
+                          if (a.type === 'email_sent') return '📧 ' + a.data.message;
+                          return null;
+                        }).filter(Boolean);
+                        if (actionMessages.length > 0) {
+                          setTimeout(() => {
+                            addMessage(actionMessages.join('\\n'), false);
+                          }, 500);
+                        }
+                      }
+                    }
                   } catch (error) {
                     typingDiv.remove();
                     addMessage('Error al enviar el mensaje. Por favor, intenta nuevamente.', false);

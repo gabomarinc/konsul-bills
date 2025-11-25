@@ -68,42 +68,76 @@ export async function GET(req: NextRequest) {
     const userId = state
     console.log('[Gmail OAuth Callback] Saving integration for userId:', userId, 'email:', email)
     
-    const integration = await prisma.gmailIntegration.upsert({
-      where: { userId },
-      update: {
-        accessToken: encryptToken(tokens.access_token),
-        refreshToken: encryptToken(tokens.refresh_token),
-        expiresAt,
-        email,
-        isActive: true,
-        lastSyncAt: null,
-        updatedAt: new Date()
-      },
-      create: {
-        id: generateId('gmail'),
-        userId,
-        accessToken: encryptToken(tokens.access_token),
-        refreshToken: encryptToken(tokens.refresh_token),
-        expiresAt,
-        email,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    })
-
-    console.log('[Gmail OAuth Callback] Integration saved successfully:', {
-      id: integration.id,
-      userId: integration.userId,
-      email: integration.email,
-      isActive: integration.isActive
+    // Verificar que el userId existe en la BD antes de guardar
+    const userExists = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
     })
     
-    // Verificar que se guardó correctamente
-    const verify = await prisma.gmailIntegration.findUnique({
-      where: { userId }
-    })
-    console.log('[Gmail OAuth Callback] Verification query result:', verify ? 'Found' : 'NOT FOUND')
+    if (!userExists) {
+      console.error('[Gmail OAuth Callback] User not found:', userId)
+      return NextResponse.redirect(
+        `${baseUrl}/settings?gmail_error=user_not_found`
+      )
+    }
+    
+    console.log('[Gmail OAuth Callback] User exists, proceeding to save integration')
+    
+    try {
+      const integration = await prisma.gmailIntegration.upsert({
+        where: { userId },
+        update: {
+          accessToken: encryptToken(tokens.access_token),
+          refreshToken: encryptToken(tokens.refresh_token),
+          expiresAt,
+          email,
+          isActive: true,
+          lastSyncAt: null,
+          updatedAt: new Date()
+        },
+        create: {
+          id: generateId('gmail'),
+          userId,
+          accessToken: encryptToken(tokens.access_token),
+          refreshToken: encryptToken(tokens.refresh_token),
+          expiresAt,
+          email,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      })
+
+      console.log('[Gmail OAuth Callback] Integration saved successfully:', {
+        id: integration.id,
+        userId: integration.userId,
+        email: integration.email,
+        isActive: integration.isActive
+      })
+      
+      // Verificar que se guardó correctamente
+      const verify = await prisma.gmailIntegration.findUnique({
+        where: { userId }
+      })
+      console.log('[Gmail OAuth Callback] Verification query result:', verify ? 'Found' : 'NOT FOUND')
+      
+      if (!verify) {
+        console.error('[Gmail OAuth Callback] Integration was not saved correctly!')
+        return NextResponse.redirect(
+          `${baseUrl}/settings?gmail_error=save_failed`
+        )
+      }
+    } catch (dbError: any) {
+      console.error('[Gmail OAuth Callback] Database error:', dbError)
+      console.error('[Gmail OAuth Callback] Error details:', {
+        code: dbError.code,
+        message: dbError.message,
+        meta: dbError.meta
+      })
+      return NextResponse.redirect(
+        `${baseUrl}/settings?gmail_error=database_error`
+      )
+    }
 
     // Redirigir a settings con éxito
     return NextResponse.redirect(

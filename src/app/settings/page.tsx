@@ -302,6 +302,15 @@ const handleDiscardPending = async (id: string) => {
         case 'callback_failed':
           errorMessage = "Error al procesar la conexión. Por favor, intenta nuevamente."
           break
+        case 'user_not_found':
+          errorMessage = "Usuario no encontrado. Por favor, inicia sesión nuevamente."
+          break
+        case 'save_failed':
+          errorMessage = "Error al guardar la integración. Por favor, intenta nuevamente."
+          break
+        case 'database_error':
+          errorMessage = "Error de base de datos. Por favor, contacta al soporte."
+          break
         default:
           errorMessage = `Error: ${gmailError}`
       }

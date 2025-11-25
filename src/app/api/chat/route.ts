@@ -310,10 +310,6 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
   "function_calls": [{"name": "funcion", "arguments": {...}}]
 }`
 
-      // Intentar con diferentes modelos de Gemini
-      let response: Response | null = null
-      let lastError: string = ''
-      
       // Usar EXACTAMENTE el mismo formato que funciona en gemini.ts
       console.log('[Chat API] Usando gemini-1.5-flash (mismo formato que gemini.ts)')
       const response = await fetch(

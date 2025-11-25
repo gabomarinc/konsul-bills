@@ -24,7 +24,8 @@ interface ChatBotProps {
 }
 
 export default function ChatBot({ className = "" }: ChatBotProps) {
-  console.log('[ChatBot] Component function called')
+  console.log('[ChatBot] ========== COMPONENT FUNCTION CALLED ==========')
+  console.log('[ChatBot] Props:', { className })
   
   const [messages, setMessages] = useState<Message[]>([
     {

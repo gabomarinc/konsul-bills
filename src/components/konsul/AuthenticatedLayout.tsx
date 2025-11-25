@@ -144,9 +144,15 @@ export default function AuthenticatedLayout({
       </div>
 
       {/* ChatBot */}
-      {user && (() => {
-        console.log('[AuthenticatedLayout] Rendering ChatBot, user:', user?.email)
-        return <ChatBot />
+      {(() => {
+        console.log('[AuthenticatedLayout] Checking user for ChatBot, user exists:', !!user, 'user email:', user?.email)
+        if (user) {
+          console.log('[AuthenticatedLayout] User exists, rendering ChatBot')
+          return <ChatBot />
+        } else {
+          console.log('[AuthenticatedLayout] No user, not rendering ChatBot')
+          return null
+        }
       })()}
     </div>
   )

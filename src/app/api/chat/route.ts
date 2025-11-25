@@ -650,6 +650,8 @@ async function executeFunction(
     }
 
     case "create_invoice": {
+      console.log('[Chat API] create_invoice - args recibidos:', args)
+      
       // Similar a create_quote pero para facturas
       let clientId: string
       const client = await prisma.client.upsert({
@@ -664,12 +666,25 @@ async function executeFunction(
         }
       })
       clientId = client.id
+      console.log('[Chat API] create_invoice - cliente encontrado/creado:', clientId)
 
-      const items = args.items || []
+      // Si viene amount y description, crear un item automáticamente
+      let items = args.items || []
+      if (!items.length && args.amount) {
+        items = [{
+          description: args.description || args.title || "Servicio",
+          qty: 1,
+          price: parseFloat(args.amount)
+        }]
+        console.log('[Chat API] create_invoice - items creados desde amount:', items)
+      }
+
+      // Calcular totales
       const tax = args.tax ?? settings?.defaultTaxRate ?? 21
       const subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.price), 0)
       const taxAmount = (subtotal * tax) / 100
       const total = Math.round((subtotal + taxAmount) * 100) / 100
+      console.log('[Chat API] create_invoice - totales calculados:', { subtotal, taxAmount, total })
 
       const invoiceId = await nextHumanId({
         companyId,
@@ -683,7 +698,7 @@ async function executeFunction(
           id: invoiceId,
           companyId,
           clientId,
-          title: args.title || "Factura",
+          title: args.title || args.description || "Factura",
           issueDate: new Date(),
           currency: args.currency || settings?.defaultCurrency || "EUR",
           tax,
@@ -697,12 +712,13 @@ async function executeFunction(
             create: items.map((item: any) => ({
               id: `item_${nanoid(16)}`,
               description: item.description,
-              qty: item.qty,
+              qty: item.qty || 1,
               price: item.price
             }))
           }
         }
       })
+      console.log('[Chat API] create_invoice - factura creada:', invoice.id)
 
       if (args.sendEmail && client.email) {
         try {

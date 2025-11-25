@@ -405,7 +405,7 @@ Ejemplo de respuesta cuando tienes toda la info:
         const jsonMatches = text.match(/\{[\s\S]*?\}/g)
         if (jsonMatches && jsonMatches.length > 0) {
           // Tomar el JSON más largo (probablemente el correcto)
-          extractedJson = jsonMatches.reduce((a, b) => a.length > b.length ? a : b)
+          extractedJson = jsonMatches.reduce((a: string, b: string) => a.length > b.length ? a : b)
           console.log('[Chat API] JSON encontrado directamente en el texto')
         }
       }

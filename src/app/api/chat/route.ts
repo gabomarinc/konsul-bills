@@ -378,30 +378,41 @@ Si aún falta información, pregunta de forma amigable qué falta.`
         data?.candidates?.[0]?.output ||
         ""
       
-      console.log('[Chat API] Respuesta recibida de gemini-2.5-flash:', text.substring(0, 500))
+      console.log('[Chat API] Respuesta recibida de gemini-2.5-flash:', text.substring(0, 1000))
       
       // Intentar extraer JSON del texto (puede estar en un bloque de código o mezclado con texto)
       let parsed: any = null
       let extractedJson: string | null = null
       
-      // Buscar JSON en bloques de código
+      // Buscar JSON en bloques de código (más específico primero)
       const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/```\s*([\s\S]*?)```/)
       if (jsonBlockMatch) {
         extractedJson = jsonBlockMatch[1].trim()
+        console.log('[Chat API] JSON encontrado en bloque de código')
       } else {
-        // Buscar JSON directamente (entre llaves)
-        const jsonMatch = text.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          extractedJson = jsonMatch[0]
+        // Buscar JSON directamente (entre llaves) - buscar el más completo
+        const jsonMatches = text.match(/\{[\s\S]*?\}/g)
+        if (jsonMatches && jsonMatches.length > 0) {
+          // Tomar el JSON más largo (probablemente el correcto)
+          extractedJson = jsonMatches.reduce((a, b) => a.length > b.length ? a : b)
+          console.log('[Chat API] JSON encontrado directamente en el texto')
         }
       }
       
       if (extractedJson) {
         try {
+          // Limpiar el JSON antes de parsear
+          extractedJson = extractedJson
+            .trim()
+            .replace(/^[\s`]+|[\s`]+$/g, "")
+            .replace(/```json/gi, "")
+            .replace(/```/g, "")
+          
           parsed = JSON.parse(extractedJson)
-          console.log('[Chat API] JSON extraído y parseado:', parsed)
-        } catch (parseError) {
-          console.warn('[Chat API] Error al parsear JSON extraído:', parseError)
+          console.log('[Chat API] JSON extraído y parseado exitosamente:', JSON.stringify(parsed, null, 2))
+        } catch (parseError: any) {
+          console.warn('[Chat API] Error al parsear JSON extraído:', parseError.message)
+          console.warn('[Chat API] JSON que falló:', extractedJson.substring(0, 200))
         }
       }
       
@@ -409,9 +420,13 @@ Si aún falta información, pregunta de forma amigable qué falta.`
         aiResponse = { message: { content: parsed.message }, function_calls: parsed.function_calls || [] }
         functionCalls = parsed.function_calls || []
         console.log('[Chat API] Function calls encontrados:', functionCalls.length)
+        if (functionCalls.length > 0) {
+          console.log('[Chat API] Detalles de function calls:', JSON.stringify(functionCalls, null, 2))
+        }
       } else {
         // Si no se pudo parsear, usar el texto directamente
         console.warn('[Chat API] No se encontró JSON válido, usando texto plano')
+        console.warn('[Chat API] Texto completo recibido:', text)
         aiResponse = { message: { content: text } }
         functionCalls = []
       }
@@ -424,21 +439,38 @@ Si aún falta información, pregunta de forma amigable qué falta.`
 
     // Ejecutar function calls
     console.log('[Chat API] Ejecutando function calls:', functionCalls.length)
+    if (functionCalls.length === 0) {
+      console.warn('[Chat API] ⚠️ No hay function calls para ejecutar')
+    }
+    
     for (const funcCall of functionCalls) {
       try {
-        console.log('[Chat API] Procesando function call:', funcCall.name, 'con arguments:', funcCall.arguments)
-        const args = typeof funcCall.arguments === "string" 
-          ? JSON.parse(funcCall.arguments) 
-          : funcCall.arguments
+        console.log('[Chat API] Procesando function call:', funcCall.name)
+        console.log('[Chat API] Arguments recibidos (raw):', funcCall.arguments)
+        
+        let args: any
+        if (typeof funcCall.arguments === "string") {
+          try {
+            args = JSON.parse(funcCall.arguments)
+          } catch (parseError) {
+            console.error('[Chat API] Error al parsear arguments como string:', parseError)
+            args = funcCall.arguments
+          }
+        } else {
+          args = funcCall.arguments
+        }
 
-        console.log('[Chat API] Arguments parseados:', args)
+        console.log('[Chat API] Arguments parseados:', JSON.stringify(args, null, 2))
         const result = await executeFunction(funcCall.name, args, company.id, authUser.userId)
-        console.log('[Chat API] Resultado de executeFunction:', result)
+        console.log('[Chat API] ✅ Resultado de executeFunction:', JSON.stringify(result, null, 2))
         if (result) {
           executedActions.push(result)
+        } else {
+          console.warn('[Chat API] ⚠️ executeFunction no devolvió resultado')
         }
       } catch (error: any) {
-        console.error(`[Chat API] Error ejecutando función ${funcCall.name}:`, error)
+        console.error(`[Chat API] ❌ Error ejecutando función ${funcCall.name}:`, error)
+        console.error(`[Chat API] Error message:`, error?.message)
         console.error(`[Chat API] Error stack:`, error?.stack)
         executedActions.push({
           type: "error",
@@ -446,6 +478,8 @@ Si aún falta información, pregunta de forma amigable qué falta.`
         })
       }
     }
+    
+    console.log('[Chat API] Total de acciones ejecutadas:', executedActions.length)
 
     // Construir mensaje de respuesta
     let responseMessage = aiResponse.message?.content || aiResponse.choices?.[0]?.message?.content || "Entendido, he procesado tu solicitud."

@@ -250,11 +250,18 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
+    console.log('[Chat API] API Keys disponibles:', {
+      hasOpenAI: !!OPENAI_API_KEY,
+      hasGemini: !!GEMINI_API_KEY
+    })
+
     let aiResponse: any
     let functionCalls: FunctionCall[] = []
     const executedActions: ActionResult[] = []
 
+    // Priorizar OpenAI si está disponible (más estable)
     if (OPENAI_API_KEY) {
+      console.log('[Chat API] Usando OpenAI')
       // Usar OpenAI con function calling
       const messages: ChatMessage[] = [
         { role: "system", content: systemPrompt },
@@ -321,23 +328,53 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
       // Usar gemini-1.5-flash con v1beta (el modelo correcto)
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: fullPrompt }]
-            }],
-            generationConfig: { 
-              temperature: 0.7
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: fullPrompt }]
+              }],
+              generationConfig: { 
+                temperature: 0.7
+              }
+            })
+          }
+        )
+        
+        if (response.ok) {
+          console.log('[Chat API] gemini-1.5-pro funcionó')
+        } else {
+          const errorText = await response.text()
+          lastError = errorText
+          console.log('[Chat API] gemini-1.5-pro falló, intentando gemini-pro')
+          
+          // Fallback a gemini-pro
+          response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{ text: fullPrompt }]
+                }],
+                generationConfig: { 
+                  temperature: 0.7
+                }
+              })
             }
-          })
+          )
         }
-      )
+      } catch (error: any) {
+        console.error('[Chat API] Error con gemini-1.5-pro:', error)
+        lastError = error.message
+      }
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`Gemini API error: ${response.statusText} - ${errorText}`)
+      if (!response || !response.ok) {
+        const errorText = lastError || await response?.text() || 'Unknown error'
+        console.error('[Chat API] Todos los modelos de Gemini fallaron:', errorText)
+        throw new Error(`Gemini API error: ${response?.statusText || 'Unknown'} - ${errorText}`)
       }
 
       const data = await response.json()

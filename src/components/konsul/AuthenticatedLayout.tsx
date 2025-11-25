@@ -9,7 +9,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { ChevronDown, ChevronRight } from "lucide-react"
 
-console.log('[AuthenticatedLayout] Module loaded, ChatBot imported:', typeof ChatBot)
+console.log('[AuthenticatedLayout] Module loaded, ChatBotSimple imported:', typeof ChatBotSimple)
 
 export default function AuthenticatedLayout({
   children,

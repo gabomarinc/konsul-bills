@@ -298,22 +298,7 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
         }))
       }
     } else if (GEMINI_API_KEY) {
-      // Usar Gemini con function calling (Gemini 1.5+ soporta function calling)
-      const messages: ChatMessage[] = [
-        { role: "user", content: systemPrompt },
-        ...conversationHistory,
-        { role: "user", content: message }
-      ]
-
-      // Convertir funciones a formato Gemini
-      const tools = [{
-        functionDeclarations: functions.map(f => ({
-          name: f.name,
-          description: f.description,
-          parameters: f.parameters
-        }))
-      }]
-
+      console.log('[Chat API] Usando Gemini')
       // Simplificar: usar prompt directo sin function calling por ahora
       const fullPrompt = `${systemPrompt}
 
@@ -325,9 +310,15 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
   "function_calls": [{"name": "funcion", "arguments": {...}}]
 }`
 
-      // Usar gemini-1.5-flash con v1beta (el modelo correcto)
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      // Intentar con diferentes modelos de Gemini
+      let response: Response | null = null
+      let lastError: string = ''
+      
+      // Usar el mismo formato que funciona en gemini.ts
+      try {
+        console.log('[Chat API] Intentando con gemini-1.5-flash (mismo formato que gemini.ts)')
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -343,11 +334,11 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
         )
         
         if (response.ok) {
-          console.log('[Chat API] gemini-1.5-pro funcionó')
+          console.log('[Chat API] gemini-1.5-flash funcionó')
         } else {
           const errorText = await response.text()
           lastError = errorText
-          console.log('[Chat API] gemini-1.5-pro falló, intentando gemini-pro')
+          console.log('[Chat API] gemini-1.5-flash falló, intentando gemini-pro')
           
           // Fallback a gemini-pro
           response = await fetch(
@@ -367,7 +358,7 @@ Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crea
           )
         }
       } catch (error: any) {
-        console.error('[Chat API] Error con gemini-1.5-pro:', error)
+        console.error('[Chat API] Error con Gemini:', error)
         lastError = error.message
       }
 

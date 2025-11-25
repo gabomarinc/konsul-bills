@@ -59,6 +59,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </AuthProvider>
           </LanguageProvider>
         </QueryProvider>
+        
+        {/* ChatBot Simple - Renderizado directo */}
+        <div id="chatbot-container" style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 99999 }}>
+          <button
+            id="chatbot-button"
+            style={{
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            }}
+            aria-label="Abrir chatbot"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </button>
+        </div>
       </body>
     </html>
   )

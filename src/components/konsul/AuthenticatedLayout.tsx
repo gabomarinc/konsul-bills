@@ -148,7 +148,8 @@ export default function AuthenticatedLayout({
       </div>
 
       {/* ChatBot Simple - Versión simplificada */}
-      <ChatBotSimple />
+      {/* Comentado temporalmente - usando versión en layout.tsx */}
+      {/* <ChatBotSimple /> */}
     </div>
   )
 }

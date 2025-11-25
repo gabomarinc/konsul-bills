@@ -147,17 +147,8 @@ export default function AuthenticatedLayout({
         <main className="p-6 overflow-y-auto">{children}</main>
       </div>
 
-      {/* ChatBot */}
-      {(() => {
-        console.log('[AuthenticatedLayout] Checking user for ChatBot, user exists:', !!user, 'user email:', user?.email)
-        if (user) {
-          console.log('[AuthenticatedLayout] User exists, rendering ChatBot')
-          return <ChatBot />
-        } else {
-          console.log('[AuthenticatedLayout] No user, not rendering ChatBot')
-          return null
-        }
-      })()}
+      {/* ChatBot - SIEMPRE renderizar para debug */}
+      <ChatBot />
     </div>
   )
 }

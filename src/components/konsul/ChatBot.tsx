@@ -274,6 +274,9 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
 
   // TEMPORAL: Renderizar directamente sin portal para debug
   console.log('[ChatBot] Returning chatbotContent directly (no portal for now)')
+  console.log('[ChatBot] chatbotContent type:', typeof chatbotContent)
+  
+  // Forzar renderizado siempre
   return chatbotContent
   
   // Código original con portal (comentado temporalmente)

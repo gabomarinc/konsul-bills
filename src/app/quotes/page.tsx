@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/tooltip"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
 import StatusDropdown from "@/components/konsul/StatusDropdown"
-import { useQuotes } from "@/hooks/useQuotes"
+import { useQuotes, useInvalidateQuotes } from "@/hooks/useQuotes"
+import { useEffect } from "react"
+import { toast } from "sonner"
 import { 
   FileText, 
   CheckCircle, 
@@ -60,8 +62,22 @@ export default function QuotesPage() {
   const router = useRouter()
   const { t } = useTranslation()
   const { data = [], isLoading } = useQuotes()
+  const invalidateQuotes = useInvalidateQuotes()
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<Quote["status"] | "all">("all")
+  
+  // Escuchar eventos de creación de cotizaciones desde el chatbot
+  useEffect(() => {
+    const handleQuoteCreated = () => {
+      invalidateQuotes()
+      toast.success("Cotización creada exitosamente")
+    }
+    
+    window.addEventListener('quoteCreated', handleQuoteCreated)
+    return () => {
+      window.removeEventListener('quoteCreated', handleQuoteCreated)
+    }
+  }, [invalidateQuotes])
 
   // Calcular estadísticas
   const stats = useMemo(() => {

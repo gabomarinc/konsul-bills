@@ -1,13 +1,14 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useEffect } from "react"
 import { useTranslation } from "@/contexts/LanguageContext"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import LoadingSpinner from "@/components/konsul/LoadingSpinner"
-import { useQuotes } from "@/hooks/useQuotes"
+import { useQuotes, useInvalidateQuotes } from "@/hooks/useQuotes"
+import { toast } from "sonner"
 import { 
   DollarSign, 
   FileText, 
@@ -56,6 +57,20 @@ const statusLabels = {
 export default function DashboardPage() {
   const { t } = useTranslation()
   const { data = [], isLoading } = useQuotes()
+  const invalidateQuotes = useInvalidateQuotes()
+  
+  // Escuchar eventos de creación de cotizaciones desde el chatbot
+  useEffect(() => {
+    const handleQuoteCreated = () => {
+      invalidateQuotes()
+      toast.success("Cotización creada exitosamente")
+    }
+    
+    window.addEventListener('quoteCreated', handleQuoteCreated)
+    return () => {
+      window.removeEventListener('quoteCreated', handleQuoteCreated)
+    }
+  }, [invalidateQuotes])
 
   // Calcular métricas
   const totalRevenue = useMemo(() => {

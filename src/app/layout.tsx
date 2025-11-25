@@ -230,10 +230,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   console.log('[ChatBot] Chat toggled, visible:', !isVisible);
                 }
                 
-                // Mantener historial de conversación
+                // Mantener historial de conversación con persistencia en localStorage
+                const STORAGE_KEY = 'konsul-chatbot-history';
                 let conversationHistory = [];
                 
-                function addMessage(text, isUser) {
+                // Cargar historial desde localStorage al iniciar
+                function loadHistory() {
+                  try {
+                    const saved = localStorage.getItem(STORAGE_KEY);
+                    if (saved) {
+                      conversationHistory = JSON.parse(saved);
+                      // Renderizar mensajes guardados
+                      conversationHistory.forEach(msg => {
+                        if (msg.role === 'user' || msg.role === 'assistant') {
+                          addMessageToUI(msg.content, msg.role === 'user', false);
+                        }
+                      });
+                    }
+                  } catch (e) {
+                    console.warn('[ChatBot] Error cargando historial:', e);
+                  }
+                }
+                
+                // Guardar historial en localStorage
+                function saveHistory() {
+                  try {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversationHistory));
+                  } catch (e) {
+                    console.warn('[ChatBot] Error guardando historial:', e);
+                  }
+                }
+                
+                // Agregar mensaje solo a la UI (sin guardar en historial)
+                function addMessageToUI(text, isUser, scroll = true) {
                   const messageDiv = document.createElement('div');
                   messageDiv.style.marginBottom = '12px';
                   messageDiv.style.display = 'flex';
@@ -250,7 +279,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   
                   messageDiv.appendChild(bubble);
                   messages.appendChild(messageDiv);
-                  messages.scrollTop = messages.scrollHeight;
+                  if (scroll) {
+                    messages.scrollTop = messages.scrollHeight;
+                  }
+                }
+                
+                function addMessage(text, isUser) {
+                  addMessageToUI(text, isUser);
                   
                   // Agregar al historial
                   conversationHistory.push({
@@ -262,7 +297,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   if (conversationHistory.length > 20) {
                     conversationHistory = conversationHistory.slice(-20);
                   }
+                  
+                  // Guardar en localStorage
+                  saveHistory();
                 }
+                
+                // Cargar historial al iniciar
+                loadHistory();
                 
                 async function sendMessage() {
                   const text = input.value.trim();
@@ -327,6 +368,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         if (actionMessages.length > 0) {
                           setTimeout(() => {
                             addMessage(actionMessages.join('\\n'), false);
+                            
+                            // Disparar evento para actualizar la lista de cotizaciones
+                            if (actions.some(a => a.type === 'quote_created' || a.type === 'invoice_created')) {
+                              window.dispatchEvent(new CustomEvent('quoteCreated'));
+                            }
                           }, 500);
                         }
                       }

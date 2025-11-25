@@ -307,19 +307,30 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
         }))
       }]
 
-      // Usar v1 en lugar de v1beta para gemini-1.5-flash
+      // Simplificar: usar prompt directo sin function calling por ahora
+      const fullPrompt = `${systemPrompt}
+
+Usuario dice: "${message}"
+
+Analiza el mensaje y responde de forma conversacional. Si el usuario quiere crear algo, extrae la información y responde en formato JSON:
+{
+  "message": "tu respuesta",
+  "function_calls": [{"name": "funcion", "arguments": {...}}]
+}`
+
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: messages.map(m => ({
-              role: m.role === "assistant" ? "model" : "user",
-              parts: [{ text: m.content }]
-            })),
-            tools,
-            generationConfig: { temperature: 0.7 }
+            contents: [{
+              parts: [{ text: fullPrompt }]
+            }],
+            generationConfig: { 
+              temperature: 0.7,
+              responseMimeType: "application/json"
+            }
           })
         }
       )
@@ -330,17 +341,18 @@ Cuando el usuario pida crear algo, extrae toda la información posible y usa las
       }
 
       const data = await response.json()
-      const candidate = data.candidates?.[0]
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
       
-      if (candidate?.functionCalls) {
-        functionCalls = candidate.functionCalls.map((fc: any) => ({
-          name: fc.name,
-          arguments: JSON.stringify(fc.args || {})
-        }))
+      try {
+        const parsed = JSON.parse(text.replace(/```json\n?/g, "").replace(/```/g, ""))
+        aiResponse = { message: { content: parsed.message }, function_calls: parsed.function_calls || [] }
+        functionCalls = parsed.function_calls || []
+      } catch (parseError) {
+        // Si no se puede parsear, usar el texto directamente
+        console.warn('[Chat API] No se pudo parsear respuesta de Gemini como JSON')
+        aiResponse = { message: { content: text } }
+        functionCalls = []
       }
-
-      const text = candidate?.content?.parts?.[0]?.text || ""
-      aiResponse = { message: { content: text } }
     } else {
       return NextResponse.json({
         message: "Lo siento, no tengo acceso a la IA en este momento. Por favor, configura OPENAI_API_KEY o GEMINI_API_KEY.",

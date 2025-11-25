@@ -10,7 +10,7 @@ export default function ChatBotScript() {
       const window = document.getElementById('chatbot-window')
       const closeBtn = document.getElementById('chatbot-close')
       const sendBtn = document.getElementById('chatbot-send')
-      const input = document.getElementById('chatbot-input')
+      const input = document.getElementById('chatbot-input') as HTMLInputElement
       const messages = document.getElementById('chatbot-messages')
       
       if (!button || !window || !messages) {

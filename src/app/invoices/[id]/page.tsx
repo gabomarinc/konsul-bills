@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma"
 import DeleteInvoiceButton from "@/components/konsul/DeleteInvoiceButton"
 import StripePaymentButton from "@/components/konsul/StripePaymentButton"
 import { isStripeEnabled } from "@/lib/stripe"
+import DownloadPDFButton from "@/components/konsul/DownloadPDFButton"
+import InvoiceActionsMenu from "@/components/konsul/InvoiceActionsMenu"
 
 function titleCase(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
@@ -44,10 +46,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
             invoiceId={inv.id} 
             isStripeConnected={stripeConnected}
           />
-          <Button asChild variant="secondary">
-            <Link href={`/invoices/${inv.id}/edit`}>Edit</Link>
-          </Button>
-          <DeleteInvoiceButton id={inv.id} />
+          <DownloadPDFButton type="invoice" id={inv.id} variant="default" />
+          <InvoiceActionsMenu invoiceId={inv.id} />
           <Button asChild variant="ghost">
             <Link href="/invoices">Back</Link>
           </Button>

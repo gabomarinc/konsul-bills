@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import DeleteQuoteButton from "@/components/konsul/DeleteQuoteButton"
 import ConvertToInvoiceButton from "@/components/konsul/ConvertToInvoiceButton"
+import DownloadPDFButton from "@/components/konsul/DownloadPDFButton"
+import QuoteActionsMenu from "@/components/konsul/QuoteActionsMenu"
 
 export const dynamic = "force-dynamic"
 
@@ -42,10 +44,8 @@ export default async function QuoteDetailPage({ params }: { params: Promise<{ id
         </div>
         <div className="flex gap-2">
           <ConvertToInvoiceButton quoteId={q.id} status={q.status} />
-          <Button asChild variant="secondary">
-            <Link href={`/quotes/${q.id}/edit`}>Edit</Link>
-          </Button>
-          <DeleteQuoteButton id={q.id} />
+          <DownloadPDFButton type="quote" id={q.id} variant="default" />
+          <QuoteActionsMenu quoteId={q.id} />
           <Button asChild variant="ghost">
             <Link href="/quotes">Back</Link>
           </Button>

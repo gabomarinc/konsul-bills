@@ -33,6 +33,8 @@
     "clsx": "^2.1.1",
     "express": "^5.1.0",
     "jose": "^6.1.0",
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.541.0",
     "nanoid": "^5.1.6",
     "next": "15.5.0",

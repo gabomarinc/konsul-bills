@@ -323,7 +323,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
       className={`fixed bottom-4 right-4 z-[9999] w-[420px] max-w-[calc(100vw-2rem)] ${className}`}
       style={{ position: 'fixed' }}
     >
-      <Card className="flex flex-col h-[650px] shadow-2xl border-0 overflow-hidden">
+      <Card className="flex flex-col h-[650px] shadow-2xl border border-white/80 bg-white overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-600 text-white">
           <div className="flex items-center gap-3">
@@ -360,10 +360,10 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
                 </div>
               )}
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 shadow ${
                   message.role === "user"
                     ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white"
-                    : "bg-white border border-slate-200/80 text-slate-900 backdrop-blur-sm"
+                    : "bg-white border border-slate-200 text-slate-900"
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
@@ -454,7 +454,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t bg-white/80 backdrop-blur-sm">
+        <div className="p-4 border-t bg-white">
           <div className="flex gap-2">
             <Input
               ref={inputRef}

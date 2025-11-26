@@ -455,11 +455,17 @@ Ejemplo de respuesta cuando tienes toda la info:
       // Intentar extraer JSON del texto (puede estar en un bloque de código o mezclado con texto)
       let parsed: any = null
       let extractedJson: string | null = null
+      let messageText: string | null = null
       
       // Buscar JSON en bloques de código (más específico primero)
       const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)```/) || text.match(/```\s*([\s\S]*?)```/)
       if (jsonBlockMatch) {
         extractedJson = jsonBlockMatch[1].trim()
+        // Extraer el texto antes del bloque JSON
+        const textBefore = text.substring(0, text.indexOf(jsonBlockMatch[0])).trim()
+        if (textBefore) {
+          messageText = textBefore
+        }
         console.log('[Chat API] JSON encontrado en bloque de código')
       } else {
         // Buscar JSON directamente (entre llaves) - buscar el más completo
@@ -467,6 +473,14 @@ Ejemplo de respuesta cuando tienes toda la info:
         if (jsonMatches && jsonMatches.length > 0) {
           // Tomar el JSON más largo (probablemente el correcto)
           extractedJson = jsonMatches.reduce((a: string, b: string) => a.length > b.length ? a : b)
+          // Extraer el texto antes del JSON
+          const jsonIndex = text.indexOf(extractedJson)
+          if (jsonIndex > 0) {
+            const textBefore = text.substring(0, jsonIndex).trim()
+            if (textBefore) {
+              messageText = textBefore
+            }
+          }
           console.log('[Chat API] JSON encontrado directamente en el texto')
         }
       }
@@ -481,6 +495,10 @@ Ejemplo de respuesta cuando tienes toda la info:
             .replace(/```/g, "")
           
           parsed = JSON.parse(extractedJson)
+          // Si hay texto antes del JSON y el parsed.message está vacío o es muy corto, usar el texto extraído
+          if (messageText && (!parsed.message || parsed.message.length < 10)) {
+            parsed.message = messageText
+          }
           console.log('[Chat API] JSON extraído y parseado exitosamente:', JSON.stringify(parsed, null, 2))
         } catch (parseError: any) {
           console.warn('[Chat API] Error al parsear JSON extraído:', parseError.message)
@@ -489,17 +507,47 @@ Ejemplo de respuesta cuando tienes toda la info:
       }
       
       if (parsed && parsed.message) {
-        aiResponse = { message: { content: parsed.message }, function_calls: parsed.function_calls || [] }
+        // Si hay function_calls, asegurarse de que el mensaje no contenga JSON
+        let cleanMessage = parsed.message
+        if (parsed.function_calls && parsed.function_calls.length > 0) {
+          // Limpiar cualquier JSON residual del mensaje
+          cleanMessage = cleanMessage
+            .replace(/```json[\s\S]*?```/gi, '')
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
+            .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
+            .trim()
+        }
+        
+        aiResponse = { message: { content: cleanMessage }, function_calls: parsed.function_calls || [] }
         functionCalls = parsed.function_calls || []
         console.log('[Chat API] Function calls encontrados:', functionCalls.length)
         if (functionCalls.length > 0) {
           console.log('[Chat API] Detalles de function calls:', JSON.stringify(functionCalls, null, 2))
         }
       } else {
-        // Si no se pudo parsear, usar el texto directamente
-        console.warn('[Chat API] No se encontró JSON válido, usando texto plano')
-        console.warn('[Chat API] Texto completo recibido:', text)
-        aiResponse = { message: { content: text } }
+        // Si no se pudo parsear, intentar extraer el texto antes del JSON
+        let cleanText = text
+        // Si el texto contiene JSON, extraer solo la parte antes del JSON
+        if (text.includes('function_calls') || text.includes('"name"') || text.includes('"arguments"')) {
+          const textBeforeJson = text.match(/(.*?)(?:\{[\s\S]*function_calls[\s\S]*\}|```json[\s\S]*?```|```[\s\S]*?```)/i)
+          if (textBeforeJson && textBeforeJson[1].trim()) {
+            cleanText = textBeforeJson[1].trim()
+          } else {
+            // Si no hay texto antes, limpiar todo el JSON
+            cleanText = text
+              .replace(/```json[\s\S]*?```/gi, '')
+              .replace(/```[\s\S]*?```/g, '')
+              .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
+              .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
+              .trim()
+          }
+        }
+        
+        console.warn('[Chat API] No se encontró JSON válido, usando texto limpio')
+        console.warn('[Chat API] Texto original:', text.substring(0, 200))
+        console.warn('[Chat API] Texto limpio:', cleanText.substring(0, 200))
+        aiResponse = { message: { content: cleanText } }
         functionCalls = []
       }
     } else {

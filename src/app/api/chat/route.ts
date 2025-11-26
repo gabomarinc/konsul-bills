@@ -76,8 +76,9 @@ export async function POST(req: NextRequest) {
     })
 
     // Detectar solicitudes directas de listas sin pasar por la IA
-    const directListIntent = detectDirectListRequest(normalizedMessage)
-    if (directListIntent) {
+    // Solo si NO hay mención de un cliente específico (dejar que la IA lo procese con filtro)
+    const directListIntent = detectDirectListRequest(normalizedMessage, clients)
+    if (directListIntent && !directListIntent.hasClientFilter) {
       try {
         const action = await executeFunction(
           directListIntent.functionName,
@@ -146,8 +147,10 @@ IMPORTANTE - CAMBIOS DE ESTADO:
 
 IMPORTANTE - LISTADOS:
 - Cuando el usuario pida listar clientes, cotizaciones o facturas, SIEMPRE usa la función correspondiente (list_clients, list_quotes, list_invoices).
-- Si el usuario menciona un cliente específico (ej: "cotizaciones para Cranealo", "facturas de QuAl"), DEBES pasar el nombre del cliente en el parámetro clientName.
-- Extrae el nombre del cliente del mensaje del usuario. Ejemplos: "para Cranealo" → clientName: "Cranealo", "de QuAl" → clientName: "QuAl", "las cotizaciones que tenemos para cranealo" → clientName: "Cranealo".
+- Si el usuario menciona un cliente específico (ej: "cotizaciones para Cranealo", "facturas de QuAl", "las cotizaciones que tenemos para cranealo"), DEBES pasar el nombre del cliente en el parámetro clientName.
+- Extrae el nombre del cliente del mensaje del usuario. Busca patrones como: "para X", "de X", "del cliente X", "de la empresa X", "que tenemos para X", "que tenemos de X".
+- Ejemplos: "para Cranealo" → clientName: "Cranealo", "de QuAl" → clientName: "QuAl", "las cotizaciones que tenemos para cranealo" → clientName: "Cranealo", "facturas del cliente QuAl" → clientName: "QuAl".
+- El nombre del cliente debe coincidir con uno de los clientes disponibles en la lista proporcionada. Si no estás seguro, usa el nombre exacto que el usuario mencionó.
 - Responde de forma amigable y natural, sin mostrar JSON ni datos técnicos. El sistema mostrará las listas de forma visual automáticamente.
 
 IMPORTANTE - CREACIÓN:
@@ -1094,13 +1097,18 @@ async function executeFunction(
       
       // Filtrar por cliente si se proporciona
       if (args.clientName) {
+        console.log('[Chat API] Filtrando cotizaciones por cliente:', args.clientName)
         whereClause.Client = {
           name: {
             contains: args.clientName,
             mode: 'insensitive'
           }
         }
+      } else {
+        console.log('[Chat API] No hay filtro de cliente, mostrando todas las cotizaciones')
       }
+      
+      console.log('[Chat API] Where clause para list_quotes:', JSON.stringify(whereClause, null, 2))
       
       const quotes = await prisma.quote.findMany({
         where: whereClause,
@@ -1108,6 +1116,11 @@ async function executeFunction(
         orderBy: { createdAt: "desc" },
         take: args.limit || 10
       })
+
+      console.log('[Chat API] Cotizaciones encontradas:', quotes.length)
+      if (quotes.length > 0) {
+        console.log('[Chat API] Primer cliente encontrado:', quotes[0].Client?.name)
+      }
 
       return {
         type: "quotes_listed",
@@ -1155,8 +1168,9 @@ function normalizeText(text: string) {
 }
 
 function detectDirectListRequest(
-  normalizedMessage: string
-): { functionName: "list_clients" | "list_quotes" | "list_invoices"; responseMessage: string } | null {
+  normalizedMessage: string,
+  availableClients: Array<{ name: string; email?: string | null }>
+): { functionName: "list_clients" | "list_quotes" | "list_invoices"; responseMessage: string; hasClientFilter: boolean } | null {
   const listKeywords = [
     "lista",
     "listado",
@@ -1175,37 +1189,74 @@ function detectDirectListRequest(
     "todas",
     "toda",
     "tus",
-    "las"
+    "las",
+    "cuales",
+    "cual"
   ]
   const hasListIntent = listKeywords.some(keyword => normalizedMessage.includes(keyword))
-  const isShortRequest = normalizedMessage.length <= 40
+  const isShortRequest = normalizedMessage.length <= 60
+
+  // Detectar si hay mención de un cliente específico
+  let hasClientFilter = false
+  let mentionedClient: string | null = null
+  
+  // Buscar patrones como "para X", "de X", "del cliente X", etc.
+  const clientPatterns = [
+    /(?:para|de|del|del cliente|de la empresa)\s+([a-záéíóúñ]+)/i,
+    /([a-záéíóúñ]+)\s+(?:cliente|empresa)/i
+  ]
+  
+  for (const pattern of clientPatterns) {
+    const match = normalizedMessage.match(pattern)
+    if (match && match[1]) {
+      const potentialClient = match[1].trim()
+      // Verificar si coincide con algún cliente disponible
+      const foundClient = availableClients.find(c => 
+        c.name.toLowerCase().includes(potentialClient.toLowerCase()) ||
+        potentialClient.toLowerCase().includes(c.name.toLowerCase())
+      )
+      if (foundClient) {
+        hasClientFilter = true
+        mentionedClient = foundClient.name
+        break
+      }
+    }
+  }
 
   const wantsQuotes = normalizedMessage.includes("cotiz")
   const wantsInvoices = normalizedMessage.includes("factur")
-  const wantsClients = normalizedMessage.includes("cliente")
+  const wantsClients = normalizedMessage.includes("cliente") && !wantsQuotes && !wantsInvoices
 
   if (!(hasListIntent || isShortRequest)) {
+    return null
+  }
+
+  // Si hay filtro por cliente, NO usar detección directa, dejar que la IA lo procese
+  if (hasClientFilter) {
     return null
   }
 
   if (wantsQuotes) {
     return {
       functionName: "list_quotes",
-      responseMessage: "¡Claro! Aquí tienes la lista de tus cotizaciones recientes. 😊"
+      responseMessage: "¡Claro! Aquí tienes la lista de tus cotizaciones recientes. 😊",
+      hasClientFilter: false
     }
   }
 
   if (wantsInvoices) {
     return {
       functionName: "list_invoices",
-      responseMessage: "¡Por supuesto! Estas son tus facturas más recientes."
+      responseMessage: "¡Por supuesto! Estas son tus facturas más recientes.",
+      hasClientFilter: false
     }
   }
 
   if (wantsClients) {
     return {
       functionName: "list_clients",
-      responseMessage: "Con gusto, aquí tienes el listado de tus clientes."
+      responseMessage: "Con gusto, aquí tienes el listado de tus clientes.",
+      hasClientFilter: false
     }
   }
 

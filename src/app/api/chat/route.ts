@@ -108,7 +108,11 @@ Puedes realizar las siguientes acciones usando function calling:
 8. list_quotes - Listar cotizaciones
 9. list_invoices - Listar facturas
 
-Cuando el usuario pida crear algo, extrae toda la información posible y usa las funciones correspondientes.`
+IMPORTANTE:
+- Cuando el usuario pida crear algo, extrae toda la información posible y usa las funciones correspondientes.
+- Cuando el usuario pida listar clientes, cotizaciones o facturas, SIEMPRE usa la función correspondiente (list_clients, list_quotes, list_invoices).
+- Responde de forma amigable y natural, sin mostrar JSON ni datos técnicos. El sistema mostrará las listas de forma visual automáticamente.
+- Si el usuario pregunta "¿puedes darme la lista de...", "muéstrame...", "quiero ver...", etc., usa inmediatamente la función de listado correspondiente.`
 
     const functions = [
       {
@@ -495,22 +499,48 @@ Ejemplo de respuesta cuando tienes toda la info:
     // Construir mensaje de respuesta
     let responseMessage = aiResponse.message?.content || aiResponse.choices?.[0]?.message?.content || "Entendido, he procesado tu solicitud."
 
-    // Agregar información sobre acciones ejecutadas
-    if (executedActions.length > 0) {
-      const actionsSummary = executedActions
-        .filter(a => a.type !== "error")
-        .map(a => {
-          if (a.type === "quote_created") return `✅ Cotización ${a.data.id} creada`
-          if (a.type === "invoice_created") return `✅ Factura ${a.data.id} creada`
-          if (a.type === "status_updated") return `✅ Estado actualizado`
-          if (a.type === "email_sent") return `📧 ${a.data.message}`
-          return null
-        })
-        .filter(Boolean)
-        .join("\n")
+    // Si hay listas, mejorar el mensaje para que sea más claro
+    const hasListActions = executedActions.some(a => 
+      ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
+    )
+    
+    if (hasListActions) {
+      // Si el mensaje contiene JSON o es muy técnico, reemplazarlo con algo más amigable
+      if (responseMessage.includes("function_calls") || responseMessage.includes("{")) {
+        const listAction = executedActions.find(a => 
+          ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
+        )
+        if (listAction) {
+          if (listAction.type === "clients_listed") {
+            const count = listAction.data?.clients?.length || 0
+            responseMessage = `¡Perfecto! Aquí tienes tu lista de clientes${count > 0 ? ` (${count} ${count === 1 ? 'cliente' : 'clientes'})` : ''}:`
+          } else if (listAction.type === "quotes_listed") {
+            const count = listAction.data?.quotes?.length || 0
+            responseMessage = `¡Por supuesto! Aquí están tus cotizaciones${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
+          } else if (listAction.type === "invoices_listed") {
+            const count = listAction.data?.invoices?.length || 0
+            responseMessage = `¡Claro! Aquí tienes tus facturas${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
+          }
+        }
+      }
+    } else {
+      // Agregar información sobre acciones ejecutadas (solo si no son listas)
+      if (executedActions.length > 0) {
+        const actionsSummary = executedActions
+          .filter(a => a.type !== "error" && !["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type))
+          .map(a => {
+            if (a.type === "quote_created") return `✅ Cotización ${a.data.id} creada`
+            if (a.type === "invoice_created") return `✅ Factura ${a.data.id} creada`
+            if (a.type === "status_updated") return `✅ Estado actualizado`
+            if (a.type === "email_sent") return `📧 ${a.data.message}`
+            return null
+          })
+          .filter(Boolean)
+          .join("\n")
 
-      if (actionsSummary) {
-        responseMessage += `\n\n${actionsSummary}`
+        if (actionsSummary) {
+          responseMessage += `\n\n${actionsSummary}`
+        }
       }
     }
 

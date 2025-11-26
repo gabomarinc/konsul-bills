@@ -648,19 +648,33 @@ Ejemplo de respuesta cuando tienes toda la info:
     // Construir mensaje de respuesta
     let responseMessage = aiResponse.message?.content || aiResponse.choices?.[0]?.message?.content || "Entendido, he procesado tu solicitud."
 
-    // Limpiar el mensaje: eliminar JSON crudo si hay function calls ejecutados
+    // Limpiar el mensaje: eliminar JSON crudo, código Python, y otros artefactos si hay function calls ejecutados
     if (functionCalls.length > 0) {
-      // Si el mensaje contiene JSON de function_calls, limpiarlo
-      if (responseMessage.includes("function_calls") || responseMessage.includes('"name"') || responseMessage.includes('"arguments"') || responseMessage.includes('}') || responseMessage.includes(']')) {
-        // Intentar extraer solo el texto antes del JSON
-        const jsonMatch = responseMessage.match(/(.*?)(?:\{[\s\S]*function_calls[\s\S]*\}|```json[\s\S]*?```|```[\s\S]*?```)/i)
-        if (jsonMatch && jsonMatch[1].trim()) {
-          responseMessage = jsonMatch[1].trim()
+      // Detectar si el mensaje contiene código o JSON
+      const hasCode = responseMessage.includes("function_calls") || 
+                      responseMessage.includes('"name"') || 
+                      responseMessage.includes('"arguments"') || 
+                      responseMessage.includes('}') || 
+                      responseMessage.includes(']') ||
+                      responseMessage.includes('print(') ||
+                      responseMessage.includes('tool_code') ||
+                      responseMessage.includes('list_quotes(') ||
+                      responseMessage.includes('list_invoices(') ||
+                      responseMessage.includes('list_clients(')
+      
+      if (hasCode) {
+        // Intentar extraer solo el texto antes del código/JSON
+        const textMatch = responseMessage.match(/(.*?)(?:```|print\(|tool_code|list_\w+\(|function_calls|\{[\s\S]*function_calls)/i)
+        if (textMatch && textMatch[1].trim()) {
+          responseMessage = textMatch[1].trim()
         } else {
-          // Si no hay texto antes del JSON, eliminar todo el JSON y caracteres sueltos
+          // Si no hay texto antes, eliminar todo el código y JSON
           responseMessage = responseMessage
+            .replace(/```[\s\S]*?```/gi, '') // Eliminar bloques de código
+            .replace(/print\([^)]*\)/gi, '') // Eliminar llamadas print()
+            .replace(/tool_code[\s\S]*?$/gi, '') // Eliminar tool_code
+            .replace(/list_\w+\([^)]*\)/gi, '') // Eliminar llamadas a funciones list_*
             .replace(/```json[\s\S]*?```/gi, '')
-            .replace(/```[\s\S]*?```/g, '')
             .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
             .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
             .replace(/\[[\s\S]*?\]/g, '') // Eliminar arrays JSON
@@ -669,7 +683,7 @@ Ejemplo de respuesta cuando tienes toda la info:
             .replace(/[\}\]]+/g, '') // Eliminar llaves y corchetes sueltos
             .trim()
           
-          // Si después de limpiar queda vacío o solo tiene caracteres especiales, usar mensaje por defecto
+          // Si después de limpiar queda vacío o solo tiene caracteres especiales, usar mensaje vacío
           if (!responseMessage || /^[\s\}\]]+$/.test(responseMessage)) {
             responseMessage = ""
           }
@@ -708,22 +722,20 @@ Ejemplo de respuesta cuando tienes toda la info:
         }
       }
     } else if (hasListActions) {
-      // Si el mensaje contiene JSON o es muy técnico, reemplazarlo con algo más amigable
-      if (responseMessage.includes("function_calls") || responseMessage.includes("{")) {
-        const listAction = executedActions.find(a => 
-          ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
-        )
-        if (listAction) {
-          if (listAction.type === "clients_listed") {
-            const count = listAction.data?.clients?.length || 0
-            responseMessage = `¡Perfecto! Aquí tienes tu lista de clientes${count > 0 ? ` (${count} ${count === 1 ? 'cliente' : 'clientes'})` : ''}:`
-          } else if (listAction.type === "quotes_listed") {
-            const count = listAction.data?.quotes?.length || 0
-            responseMessage = `¡Por supuesto! Aquí están tus cotizaciones${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
-          } else if (listAction.type === "invoices_listed") {
-            const count = listAction.data?.invoices?.length || 0
-            responseMessage = `¡Claro! Aquí tienes tus facturas${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
-          }
+      // Si hay listas, SIEMPRE reemplazar el mensaje con uno amigable
+      const listAction = executedActions.find(a => 
+        ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
+      )
+      if (listAction) {
+        if (listAction.type === "clients_listed") {
+          const count = listAction.data?.clients?.length || 0
+          responseMessage = `¡Perfecto! Aquí tienes tu lista de clientes${count > 0 ? ` (${count} ${count === 1 ? 'cliente' : 'clientes'})` : ''}:`
+        } else if (listAction.type === "quotes_listed") {
+          const count = listAction.data?.quotes?.length || 0
+          responseMessage = `¡Claro! Aquí tienes las cotizaciones${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
+        } else if (listAction.type === "invoices_listed") {
+          const count = listAction.data?.invoices?.length || 0
+          responseMessage = `¡Claro! Aquí tienes las facturas${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
         }
       }
     } else {

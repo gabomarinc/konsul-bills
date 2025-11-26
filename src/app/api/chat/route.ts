@@ -532,14 +532,31 @@ Ejemplo de respuesta cuando tienes toda la info:
           args = funcCall.arguments
         }
 
-        // Resolver IDs cuando el usuario dice "la última" o similar
-        if ((funcCall.name === "update_quote_status" || funcCall.name === "update_invoice_status") && args) {
-          if (!args.quoteId && !args.invoiceId) {
-            // Si no hay ID, usar el más reciente
-            if (funcCall.name === "update_quote_status" && recentQuotes.length > 0) {
+        // Normalizar argumentos (corregir nombres de parámetros)
+        if (funcCall.name === "update_quote_status" && args) {
+          // Corregir newStatus -> status
+          if (args.newStatus && !args.status) {
+            args.status = args.newStatus
+            delete args.newStatus
+          }
+          // Resolver IDs cuando el usuario dice "la última" o similar
+          if (!args.quoteId) {
+            if (recentQuotes.length > 0) {
               args.quoteId = recentQuotes[0].id
               console.log('[Chat API] Usando cotización más reciente:', args.quoteId)
-            } else if (funcCall.name === "update_invoice_status" && recentInvoices.length > 0) {
+            }
+          }
+        }
+        
+        if (funcCall.name === "update_invoice_status" && args) {
+          // Corregir newStatus -> status
+          if (args.newStatus && !args.status) {
+            args.status = args.newStatus
+            delete args.newStatus
+          }
+          // Resolver IDs cuando el usuario dice "la última" o similar
+          if (!args.invoiceId) {
+            if (recentInvoices.length > 0) {
               args.invoiceId = recentInvoices[0].id
               console.log('[Chat API] Usando factura más reciente:', args.invoiceId)
             }
@@ -569,6 +586,31 @@ Ejemplo de respuesta cuando tienes toda la info:
 
     // Construir mensaje de respuesta
     let responseMessage = aiResponse.message?.content || aiResponse.choices?.[0]?.message?.content || "Entendido, he procesado tu solicitud."
+
+    // Limpiar el mensaje: eliminar JSON crudo si hay function calls ejecutados
+    if (functionCalls.length > 0) {
+      // Si el mensaje contiene JSON de function_calls, limpiarlo
+      if (responseMessage.includes("function_calls") || responseMessage.includes('"name"') || responseMessage.includes('"arguments"')) {
+        // Intentar extraer solo el texto antes del JSON
+        const jsonMatch = responseMessage.match(/(.*?)(?:\{[\s\S]*function_calls[\s\S]*\}|```json[\s\S]*?```|```[\s\S]*?```)/i)
+        if (jsonMatch && jsonMatch[1].trim()) {
+          responseMessage = jsonMatch[1].trim()
+        } else {
+          // Si no hay texto antes del JSON, eliminar todo el JSON
+          responseMessage = responseMessage
+            .replace(/```json[\s\S]*?```/gi, '')
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
+            .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
+            .trim()
+          
+          // Si después de limpiar queda vacío, usar mensaje por defecto
+          if (!responseMessage) {
+            responseMessage = ""
+          }
+        }
+      }
+    }
 
     // Verificar si hay cambios de estado (prioridad sobre listas)
     const hasStatusUpdate = executedActions.some(a => a.type === "status_updated")

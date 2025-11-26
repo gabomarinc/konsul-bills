@@ -651,22 +651,26 @@ Ejemplo de respuesta cuando tienes toda la info:
     // Limpiar el mensaje: eliminar JSON crudo si hay function calls ejecutados
     if (functionCalls.length > 0) {
       // Si el mensaje contiene JSON de function_calls, limpiarlo
-      if (responseMessage.includes("function_calls") || responseMessage.includes('"name"') || responseMessage.includes('"arguments"')) {
+      if (responseMessage.includes("function_calls") || responseMessage.includes('"name"') || responseMessage.includes('"arguments"') || responseMessage.includes('}') || responseMessage.includes(']')) {
         // Intentar extraer solo el texto antes del JSON
         const jsonMatch = responseMessage.match(/(.*?)(?:\{[\s\S]*function_calls[\s\S]*\}|```json[\s\S]*?```|```[\s\S]*?```)/i)
         if (jsonMatch && jsonMatch[1].trim()) {
           responseMessage = jsonMatch[1].trim()
         } else {
-          // Si no hay texto antes del JSON, eliminar todo el JSON
+          // Si no hay texto antes del JSON, eliminar todo el JSON y caracteres sueltos
           responseMessage = responseMessage
             .replace(/```json[\s\S]*?```/gi, '')
             .replace(/```[\s\S]*?```/g, '')
             .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
             .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
+            .replace(/\[[\s\S]*?\]/g, '') // Eliminar arrays JSON
+            .replace(/\{[\s\S]*?\}/g, '') // Eliminar cualquier objeto JSON restante
+            .replace(/^[\s\}\]]+$/gm, '') // Eliminar líneas que solo contengan llaves o corchetes
+            .replace(/[\}\]]+/g, '') // Eliminar llaves y corchetes sueltos
             .trim()
           
-          // Si después de limpiar queda vacío, usar mensaje por defecto
-          if (!responseMessage) {
+          // Si después de limpiar queda vacío o solo tiene caracteres especiales, usar mensaje por defecto
+          if (!responseMessage || /^[\s\}\]]+$/.test(responseMessage)) {
             responseMessage = ""
           }
         }

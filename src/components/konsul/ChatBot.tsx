@@ -233,13 +233,23 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
     setMounted(true)
   }, [])
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  const scrollToBottom = (instant = false) => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: instant ? "auto" : "smooth" })
+    }, instant ? 0 : 100)
   }
 
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Scroll al último mensaje cuando se abre el chat
+  useEffect(() => {
+    if (!isMinimized && messages.length > 0) {
+      // Scroll instantáneo cuando se abre el chat
+      scrollToBottom(true)
+    }
+  }, [isMinimized])
 
   const sendMessage = async (customMessage?: string) => {
     const messageToSend = customMessage || input.trim()

@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+    
+    const normalizedMessage = normalizeText(message)
 
     // Obtener clientes disponibles
     const clients = await prisma.client.findMany({
@@ -72,6 +74,27 @@ export async function POST(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       take: 10
     })
+
+    // Detectar solicitudes directas de listas sin pasar por la IA
+    const directListIntent = detectDirectListRequest(normalizedMessage)
+    if (directListIntent) {
+      try {
+        const action = await executeFunction(
+          directListIntent.functionName,
+          { limit: 10 },
+          company.id,
+          authUser.userId
+        )
+
+        return NextResponse.json({
+          message: directListIntent.responseMessage,
+          actions: action ? [action] : []
+        })
+      } catch (directListError) {
+        console.error('[Chat API] Error ejecutando listado directo:', directListError)
+        // Continuar con la IA si falla
+      }
+    }
 
     // Construir contexto para la IA
     const clientsList = clients.map(c => `- ${c.name}${c.email ? ` (${c.email})` : ''}`).join('\n')
@@ -933,5 +956,46 @@ async function executeFunction(
       console.warn(`Función desconocida: ${functionName}`)
       return null
   }
+}
+
+function normalizeText(text: string) {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+}
+
+function detectDirectListRequest(
+  normalizedMessage: string
+): { functionName: "list_clients" | "list_quotes" | "list_invoices"; responseMessage: string } | null {
+  const listKeywords = ["lista", "listado", "muestrame", "muestreme", "mostrar", "mostrame", "ver", "ensename", "enseneme", "dame", "quiero ver", "quiero la", "quiero el"]
+  const hasListIntent = listKeywords.some(keyword => normalizedMessage.includes(keyword))
+
+  if (!hasListIntent) {
+    return null
+  }
+
+  if (normalizedMessage.includes("cotiz")) {
+    return {
+      functionName: "list_quotes",
+      responseMessage: "¡Claro! Aquí tienes la lista de tus cotizaciones recientes. 😊"
+    }
+  }
+
+  if (normalizedMessage.includes("factur")) {
+    return {
+      functionName: "list_invoices",
+      responseMessage: "¡Por supuesto! Estas son tus facturas más recientes."
+    }
+  }
+
+  if (normalizedMessage.includes("cliente")) {
+    return {
+      functionName: "list_clients",
+      responseMessage: "Con gusto, aquí tienes el listado de tus clientes."
+    }
+  }
+
+  return null
 }
 

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { 
   Send, Bot, User, Loader2, Minimize2, 
   Users, FileText, Receipt, Mail, Plus,
-  CheckCircle2, Building2
+  CheckCircle2, Building2, RefreshCw
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -179,21 +179,54 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   console.log('[ChatBot] ========== COMPONENT FUNCTION CALLED ==========')
   console.log('[ChatBot] Props:', { className })
   
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  // Cargar mensajes desde localStorage al iniciar
+  const loadMessagesFromStorage = (): Message[] => {
+    if (typeof window === 'undefined') return []
+    try {
+      const stored = localStorage.getItem('konsul-chat-history')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        // Convertir timestamps de string a Date
+        return parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }
+    } catch (error) {
+      console.error('[ChatBot] Error cargando historial:', error)
+    }
+    // Mensaje de bienvenida por defecto
+    return [{
       id: "welcome",
-      role: "assistant",
+      role: "assistant" as const,
       content: "¡Hola! 👋 Soy Axel, tu asistente de Konsul Bills. Puedo ayudarte a gestionar clientes, cotizaciones y facturas. ¿En qué puedo ayudarte?",
       timestamp: new Date()
-    }
-  ])
+    }]
+  }
+
+  const [messages, setMessages] = useState<Message[]>(loadMessagesFromStorage)
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [isMinimized, setIsMinimized] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [showQuickActions, setShowQuickActions] = useState(true)
+  const [showQuickActions, setShowQuickActions] = useState(messages.length === 1)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Guardar mensajes en localStorage cada vez que cambien
+  useEffect(() => {
+    if (typeof window !== 'undefined' && messages.length > 0) {
+      try {
+        // No guardar el mensaje de bienvenida si es el único
+        const messagesToSave = messages.length === 1 && messages[0].id === "welcome" 
+          ? [] 
+          : messages
+        localStorage.setItem('konsul-chat-history', JSON.stringify(messagesToSave))
+      } catch (error) {
+        console.error('[ChatBot] Error guardando historial:', error)
+      }
+    }
+  }, [messages])
 
   useEffect(() => {
     console.log('[ChatBot] useEffect - setting mounted to true')
@@ -291,6 +324,20 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
     sendMessage(prompt)
   }
 
+  const clearHistory = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('konsul-chat-history')
+      setMessages([{
+        id: "welcome",
+        role: "assistant",
+        content: "¡Hola! 👋 Soy Axel, tu asistente de Konsul Bills. Puedo ayudarte a gestionar clientes, cotizaciones y facturas. ¿En qué puedo ayudarte?",
+        timestamp: new Date()
+      }])
+      setShowQuickActions(true)
+      toast.success("Historial limpiado")
+    }
+  }
+
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
@@ -335,14 +382,27 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
               <p className="text-xs text-blue-100">Konsul Bills</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsMinimized(true)}
-            className="h-8 w-8 p-0 text-white hover:bg-white/20 rounded-full"
-          >
-            <Minimize2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {messages.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearHistory}
+                className="h-8 w-8 p-0 text-white hover:bg-white/20 rounded-full"
+                title="Limpiar historial"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsMinimized(true)}
+              className="h-8 w-8 p-0 text-white hover:bg-white/20 rounded-full"
+            >
+              <Minimize2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Messages */}

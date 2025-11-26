@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Detectar solicitudes de cambio de estado - NO ejecutar directamente, dejar que la IA lo procese
+    // pero mejorar el contexto para que la IA entienda mejor
+
     // Construir contexto para la IA
     const clientsList = clients.map(c => `- ${c.name}${c.email ? ` (${c.email})` : ''}`).join('\n')
     const quotesList = recentQuotes.map(q => `- ${q.id}: ${q.title} (${q.Client.name}) - Estado: ${q.status}`).join('\n')
@@ -114,10 +117,10 @@ Contexto del usuario:
 - Clientes disponibles:
 ${clientsList || "No hay clientes registrados"}
 
-Cotizaciones recientes:
+Cotizaciones recientes (MÁS RECIENTE PRIMERO):
 ${quotesList || "No hay cotizaciones"}
 
-Facturas recientes:
+Facturas recientes (MÁS RECIENTE PRIMERO):
 ${invoicesList || "No hay facturas"}
 
 Puedes realizar las siguientes acciones usando function calling:
@@ -131,11 +134,21 @@ Puedes realizar las siguientes acciones usando function calling:
 8. list_quotes - Listar cotizaciones
 9. list_invoices - Listar facturas
 
-IMPORTANTE:
-- Cuando el usuario pida crear algo, extrae toda la información posible y usa las funciones correspondientes.
+IMPORTANTE - CAMBIOS DE ESTADO:
+- Cuando el usuario pida cambiar el estado de una cotización o factura, DEBES usar update_quote_status o update_invoice_status.
+- El usuario puede usar lenguaje natural como: "acepta la cotización", "marca como aceptada", "cambia a aceptada", "pon en enviado", "marca como pagada", etc.
+- Si dice "la última cotización", "la última factura", "la más reciente", usa el ID de la primera en la lista (la más reciente).
+- Si menciona un ID específico (como Q-00009, INV-00005), usa ese ID exacto.
+- Estados válidos para cotizaciones: "draft" (borrador), "sent" (enviada), "accepted" (aceptada), "rejected" (rechazada).
+- Estados válidos para facturas: "draft" (borrador), "sent" (enviada), "paid" (pagada), "overdue" (vencida), "cancelled" (cancelada).
+- NO listes las cotizaciones cuando el usuario pide cambiar un estado. Ejecuta directamente el cambio de estado.
+
+IMPORTANTE - LISTADOS:
 - Cuando el usuario pida listar clientes, cotizaciones o facturas, SIEMPRE usa la función correspondiente (list_clients, list_quotes, list_invoices).
 - Responde de forma amigable y natural, sin mostrar JSON ni datos técnicos. El sistema mostrará las listas de forma visual automáticamente.
-- Si el usuario pregunta "¿puedes darme la lista de...", "muéstrame...", "quiero ver...", etc., usa inmediatamente la función de listado correspondiente.`
+
+IMPORTANTE - CREACIÓN:
+- Cuando el usuario pida crear algo, extrae toda la información posible y usa las funciones correspondientes.`
 
     const functions = [
       {
@@ -196,24 +209,38 @@ IMPORTANTE:
       },
       {
         name: "update_quote_status",
-        description: "Cambiar el estado de una cotización",
+        description: "Cambiar el estado de una cotización. Usa esta función cuando el usuario pida aceptar, rechazar, enviar o cambiar el estado de una cotización. Si dice 'la última' o 'la más reciente', usa el ID de la cotización más reciente de la lista proporcionada.",
         parameters: {
           type: "object",
           properties: {
-            quoteId: { type: "string", description: "ID de la cotización" },
-            status: { type: "string", enum: ["draft", "sent", "accepted", "rejected"], description: "Nuevo estado" }
+            quoteId: { 
+              type: "string", 
+              description: "ID de la cotización (ej: Q-00009). Si el usuario dice 'la última', 'la más reciente' o similar, usa el ID de la primera cotización en la lista de cotizaciones recientes." 
+            },
+            status: { 
+              type: "string", 
+              enum: ["draft", "sent", "accepted", "rejected"], 
+              description: "Nuevo estado. 'accepted' para aceptar, 'rejected' para rechazar, 'sent' para enviar, 'draft' para borrador." 
+            }
           },
           required: ["quoteId", "status"]
         }
       },
       {
         name: "update_invoice_status",
-        description: "Cambiar el estado de una factura",
+        description: "Cambiar el estado de una factura. Usa esta función cuando el usuario pida marcar como pagada, enviar, cancelar o cambiar el estado de una factura. Si dice 'la última' o 'la más reciente', usa el ID de la factura más reciente de la lista proporcionada.",
         parameters: {
           type: "object",
           properties: {
-            invoiceId: { type: "string", description: "ID de la factura" },
-            status: { type: "string", enum: ["draft", "sent", "paid", "overdue", "cancelled"], description: "Nuevo estado" }
+            invoiceId: { 
+              type: "string", 
+              description: "ID de la factura (ej: INV-00005). Si el usuario dice 'la última', 'la más reciente' o similar, usa el ID de la primera factura en la lista de facturas recientes." 
+            },
+            status: { 
+              type: "string", 
+              enum: ["draft", "sent", "paid", "overdue", "cancelled"], 
+              description: "Nuevo estado. 'paid' para pagada, 'sent' para enviada, 'cancelled' para cancelada, 'overdue' para vencida, 'draft' para borrador." 
+            }
           },
           required: ["invoiceId", "status"]
         }
@@ -505,6 +532,20 @@ Ejemplo de respuesta cuando tienes toda la info:
           args = funcCall.arguments
         }
 
+        // Resolver IDs cuando el usuario dice "la última" o similar
+        if ((funcCall.name === "update_quote_status" || funcCall.name === "update_invoice_status") && args) {
+          if (!args.quoteId && !args.invoiceId) {
+            // Si no hay ID, usar el más reciente
+            if (funcCall.name === "update_quote_status" && recentQuotes.length > 0) {
+              args.quoteId = recentQuotes[0].id
+              console.log('[Chat API] Usando cotización más reciente:', args.quoteId)
+            } else if (funcCall.name === "update_invoice_status" && recentInvoices.length > 0) {
+              args.invoiceId = recentInvoices[0].id
+              console.log('[Chat API] Usando factura más reciente:', args.invoiceId)
+            }
+          }
+        }
+
         console.log('[Chat API] Arguments parseados:', JSON.stringify(args, null, 2))
         const result = await executeFunction(funcCall.name, args, company.id, authUser.userId)
         console.log('[Chat API] ✅ Resultado de executeFunction:', JSON.stringify(result, null, 2))
@@ -529,12 +570,37 @@ Ejemplo de respuesta cuando tienes toda la info:
     // Construir mensaje de respuesta
     let responseMessage = aiResponse.message?.content || aiResponse.choices?.[0]?.message?.content || "Entendido, he procesado tu solicitud."
 
+    // Verificar si hay cambios de estado (prioridad sobre listas)
+    const hasStatusUpdate = executedActions.some(a => a.type === "status_updated")
+    
     // Si hay listas, mejorar el mensaje para que sea más claro
     const hasListActions = executedActions.some(a => 
       ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
     )
     
-    if (hasListActions) {
+    // Si hay cambio de estado, NO mostrar listas, solo confirmar el cambio
+    if (hasStatusUpdate) {
+      const statusAction = executedActions.find(a => a.type === "status_updated")
+      if (statusAction) {
+        const docId = statusAction.data.quoteId || statusAction.data.invoiceId
+        const status = statusAction.data.status
+        const statusLabels: Record<string, string> = {
+          "accepted": "aceptada",
+          "rejected": "rechazada",
+          "sent": "enviada",
+          "paid": "pagada",
+          "draft": "borrador",
+          "overdue": "vencida",
+          "cancelled": "cancelada"
+        }
+        const statusLabel = statusLabels[status.toLowerCase()] || status
+        
+        // Si el mensaje de la IA ya es bueno, usarlo; si no, crear uno mejor
+        if (!responseMessage.includes("actualizado") && !responseMessage.includes("cambiado") && !responseMessage.includes(statusLabel)) {
+          responseMessage = `¡Listo! ✅ He cambiado el estado de ${docId} a ${statusLabel.toUpperCase()}.`
+        }
+      }
+    } else if (hasListActions) {
       // Si el mensaje contiene JSON o es muy técnico, reemplazarlo con algo más amigable
       if (responseMessage.includes("function_calls") || responseMessage.includes("{")) {
         const listAction = executedActions.find(a => 
@@ -554,14 +620,13 @@ Ejemplo de respuesta cuando tienes toda la info:
         }
       }
     } else {
-      // Agregar información sobre acciones ejecutadas (solo si no son listas)
+      // Agregar información sobre acciones ejecutadas (solo si no son listas ni cambios de estado)
       if (executedActions.length > 0) {
         const actionsSummary = executedActions
-          .filter(a => a.type !== "error" && !["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type))
+          .filter(a => a.type !== "error" && !["clients_listed", "quotes_listed", "invoices_listed", "status_updated"].includes(a.type))
           .map(a => {
             if (a.type === "quote_created") return `✅ Cotización ${a.data.id} creada`
             if (a.type === "invoice_created") return `✅ Factura ${a.data.id} creada`
-            if (a.type === "status_updated") return `✅ Estado actualizado`
             if (a.type === "email_sent") return `📧 ${a.data.message}`
             return null
           })

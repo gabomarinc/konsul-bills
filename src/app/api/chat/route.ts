@@ -146,6 +146,8 @@ IMPORTANTE - CAMBIOS DE ESTADO:
 
 IMPORTANTE - LISTADOS:
 - Cuando el usuario pida listar clientes, cotizaciones o facturas, SIEMPRE usa la función correspondiente (list_clients, list_quotes, list_invoices).
+- Si el usuario menciona un cliente específico (ej: "cotizaciones para Cranealo", "facturas de QuAl"), DEBES pasar el nombre del cliente en el parámetro clientName.
+- Extrae el nombre del cliente del mensaje del usuario. Ejemplos: "para Cranealo" → clientName: "Cranealo", "de QuAl" → clientName: "QuAl", "las cotizaciones que tenemos para cranealo" → clientName: "Cranealo".
 - Responde de forma amigable y natural, sin mostrar JSON ni datos técnicos. El sistema mostrará las listas de forma visual automáticamente.
 
 IMPORTANTE - CREACIÓN:
@@ -279,22 +281,24 @@ IMPORTANTE - CREACIÓN:
       },
       {
         name: "list_quotes",
-        description: "Listar cotizaciones recientes",
+        description: "Listar cotizaciones recientes. Si el usuario menciona un cliente específico (ej: 'para Cranealo', 'de QuAl'), usa el parámetro clientName para filtrar solo las cotizaciones de ese cliente.",
         parameters: {
           type: "object",
           properties: {
-            limit: { type: "number", description: "Número de cotizaciones a listar", default: 10 }
+            limit: { type: "number", description: "Número de cotizaciones a listar", default: 10 },
+            clientName: { type: "string", description: "Nombre del cliente para filtrar (opcional). Si el usuario dice 'para X', 'de X', 'de X cliente', usa X como clientName." }
           },
           required: []
         }
       },
       {
         name: "list_invoices",
-        description: "Listar facturas recientes",
+        description: "Listar facturas recientes. Si el usuario menciona un cliente específico (ej: 'para Cranealo', 'de QuAl'), usa el parámetro clientName para filtrar solo las facturas de ese cliente.",
         parameters: {
           type: "object",
           properties: {
-            limit: { type: "number", description: "Número de facturas a listar", default: 10 }
+            limit: { type: "number", description: "Número de facturas a listar", default: 10 },
+            clientName: { type: "string", description: "Nombre del cliente para filtrar (opcional). Si el usuario dice 'para X', 'de X', 'de X cliente', usa X como clientName." }
           },
           required: []
         }
@@ -1086,8 +1090,20 @@ async function executeFunction(
     }
 
     case "list_quotes": {
+      const whereClause: any = { companyId }
+      
+      // Filtrar por cliente si se proporciona
+      if (args.clientName) {
+        whereClause.Client = {
+          name: {
+            contains: args.clientName,
+            mode: 'insensitive'
+          }
+        }
+      }
+      
       const quotes = await prisma.quote.findMany({
-        where: { companyId },
+        where: whereClause,
         select: { id: true, title: true, status: true, total: true, Client: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
         take: args.limit || 10
@@ -1100,8 +1116,20 @@ async function executeFunction(
     }
 
     case "list_invoices": {
+      const whereClause: any = { companyId }
+      
+      // Filtrar por cliente si se proporciona
+      if (args.clientName) {
+        whereClause.Client = {
+          name: {
+            contains: args.clientName,
+            mode: 'insensitive'
+          }
+        }
+      }
+      
       const invoices = await prisma.invoice.findMany({
-        where: { companyId },
+        where: whereClause,
         select: { id: true, title: true, status: true, total: true, Client: { select: { name: true } } },
         orderBy: { createdAt: "desc" },
         take: args.limit || 10

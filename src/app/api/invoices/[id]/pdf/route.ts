@@ -42,9 +42,9 @@ export async function GET(
     const doc = new jsPDF()
     
     // Configuración de colores
-    const primaryColor = [59, 130, 246] // blue-500
-    const textColor = [15, 23, 42] // slate-900
-    const lightGray = [241, 245, 249] // slate-100
+    const primaryColor: [number, number, number] = [59, 130, 246] // blue-500
+    const textColor: [number, number, number] = [15, 23, 42] // slate-900
+    const lightGray: [number, number, number] = [241, 245, 249] // slate-100
 
     // Header con logo
     let yPos = 20

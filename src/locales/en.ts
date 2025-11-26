@@ -325,6 +325,7 @@ export const en: TranslationKeys = {
     
     businessSettings: "Business Settings",
     businessSubtitle: "Configure your business details",
+    companyLogo: "Company Logo",
     businessAddress: "Business Address",
     taxId: "Tax ID",
     defaultCurrency: "Default Currency",

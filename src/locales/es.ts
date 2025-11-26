@@ -323,6 +323,7 @@ export const es = {
     
     businessSettings: "Configuración de Negocio",
     businessSubtitle: "Configura los detalles de tu negocio",
+    companyLogo: "Logo de la Empresa",
     businessAddress: "Dirección del Negocio",
     taxId: "ID Fiscal / EIN",
     defaultCurrency: "Moneda por defecto",

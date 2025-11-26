@@ -28,7 +28,10 @@ import {
   ExternalLink,
   CreditCard,
   MessageCircle,
-  CheckCircle2
+  CheckCircle2,
+  Upload,
+  X,
+  Image as ImageIcon
 } from "lucide-react"
 import { toast } from "sonner"
 import GmailIntegrationWizard from "@/components/konsul/GmailIntegrationWizard"
@@ -52,7 +55,8 @@ export default function SettingsPage() {
     taxId: "",
     defaultCurrency: "EUR",
     defaultTaxRate: 21.00,
-    defaultPaymentTerms: "Net 30 días"
+    defaultPaymentTerms: "Net 30 días",
+    logoUrl: null as string | null
   })
 
   const [loadingProfile, setLoadingProfile] = useState(false)
@@ -217,7 +221,8 @@ const handleDiscardPending = async (id: string) => {
             taxId: businessData.taxId || "",
             defaultCurrency: businessData.defaultCurrency || "EUR",
             defaultTaxRate: businessData.defaultTaxRate ?? 21.00,
-            defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días"
+            defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días",
+            logoUrl: businessData.logoUrl || null
           })
         }
 
@@ -762,6 +767,78 @@ const handleDiscardPending = async (id: string) => {
               </div>
               
               <div className="space-y-4">
+                {/* Logo Upload */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    {t.settings.companyLogo || "Logo de la Empresa"}
+                  </label>
+                  <div className="mt-2">
+                    {businessSettings.logoUrl ? (
+                      <div className="relative inline-block">
+                        <div className="relative w-32 h-32 border-2 border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center">
+                          <img
+                            src={businessSettings.logoUrl}
+                            alt="Company Logo"
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white p-0"
+                          onClick={() => setBusinessSettings(prev => ({ ...prev, logoUrl: null }))}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <ImageIcon className="w-10 h-10 mb-2 text-slate-400" />
+                          <p className="mb-2 text-sm text-slate-500">
+                            <span className="font-semibold">Click para subir</span> o arrastra
+                          </p>
+                          <p className="text-xs text-slate-500">PNG, JPG (MAX. 2MB)</p>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/png,image/jpeg,image/jpg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              // Validar tamaño (2MB)
+                              if (file.size > 2 * 1024 * 1024) {
+                                toast.error("El archivo es demasiado grande. Máximo 2MB.")
+                                return
+                              }
+                              // Validar tipo
+                              if (!file.type.startsWith('image/')) {
+                                toast.error("Por favor, sube una imagen válida.")
+                                return
+                              }
+                              // Convertir a base64
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                const base64String = reader.result as string
+                                setBusinessSettings(prev => ({ ...prev, logoUrl: base64String }))
+                              }
+                              reader.onerror = () => {
+                                toast.error("Error al leer el archivo.")
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    El logo aparecerá en tus cotizaciones y facturas PDF
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-2">{t.settings.businessAddress}</label>
                   <Input

@@ -728,11 +728,11 @@ Ejemplo de respuesta cuando tienes toda la info:
         )
         if (listFunctionCall) {
           try {
-            let args = listFunctionCall.arguments
+            let args: any = listFunctionCall.arguments
             if (typeof args === 'string') {
               args = JSON.parse(args)
             }
-            if (args && args.clientName) {
+            if (args && typeof args === 'object' && 'clientName' in args) {
               clientName = args.clientName
             }
           } catch (e) {

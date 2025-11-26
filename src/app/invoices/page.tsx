@@ -65,7 +65,7 @@ export default function InvoicesPage() {
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<Invoice["status"] | "all">("all")
   
-  // Escuchar eventos de creación de facturas desde el chatbot
+  // Escuchar eventos de creación y actualización de facturas desde el chatbot
   useEffect(() => {
     const handleInvoiceCreated = () => {
       console.log('[InvoicesPage] Evento invoiceCreated recibido')
@@ -73,10 +73,18 @@ export default function InvoicesPage() {
       toast.success("Factura creada exitosamente")
     }
     
-    console.log('[InvoicesPage] Registrando listener para invoiceCreated')
+    const handleInvoiceStatusUpdated = () => {
+      console.log('[InvoicesPage] Evento invoiceStatusUpdated recibido')
+      invalidateInvoices()
+      // No mostrar toast adicional, el chatbot ya lo mostró
+    }
+    
+    console.log('[InvoicesPage] Registrando listeners para eventos de facturas')
     window.addEventListener('invoiceCreated', handleInvoiceCreated)
+    window.addEventListener('invoiceStatusUpdated', handleInvoiceStatusUpdated)
     return () => {
       window.removeEventListener('invoiceCreated', handleInvoiceCreated)
+      window.removeEventListener('invoiceStatusUpdated', handleInvoiceStatusUpdated)
     }
   }, [invalidateInvoices])
 

@@ -61,11 +61,16 @@ export default function DashboardPage() {
   const invalidateQuotes = useInvalidateQuotes()
   const invalidateInvoices = useInvalidateInvoices()
   
-  // Escuchar eventos de creación de cotizaciones y facturas desde el chatbot
+  // Escuchar eventos de creación y actualización de cotizaciones y facturas desde el chatbot
   useEffect(() => {
     const handleQuoteCreated = () => {
       invalidateQuotes()
       toast.success("Cotización creada exitosamente")
+    }
+    
+    const handleQuoteStatusUpdated = () => {
+      invalidateQuotes()
+      // No mostrar toast adicional, el chatbot ya lo mostró
     }
     
     const handleInvoiceCreated = () => {
@@ -74,11 +79,21 @@ export default function DashboardPage() {
       toast.success("Factura creada exitosamente")
     }
     
+    const handleInvoiceStatusUpdated = () => {
+      invalidateInvoices()
+      invalidateQuotes() // También actualizar cotizaciones por si hay cambios relacionados
+      // No mostrar toast adicional, el chatbot ya lo mostró
+    }
+    
     window.addEventListener('quoteCreated', handleQuoteCreated)
+    window.addEventListener('quoteStatusUpdated', handleQuoteStatusUpdated)
     window.addEventListener('invoiceCreated', handleInvoiceCreated)
+    window.addEventListener('invoiceStatusUpdated', handleInvoiceStatusUpdated)
     return () => {
       window.removeEventListener('quoteCreated', handleQuoteCreated)
+      window.removeEventListener('quoteStatusUpdated', handleQuoteStatusUpdated)
       window.removeEventListener('invoiceCreated', handleInvoiceCreated)
+      window.removeEventListener('invoiceStatusUpdated', handleInvoiceStatusUpdated)
     }
   }, [invalidateQuotes, invalidateInvoices])
 

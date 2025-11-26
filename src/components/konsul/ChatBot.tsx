@@ -289,15 +289,25 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
 
       setMessages(prev => [...prev, assistantMessage])
 
-      // Si hay acciones ejecutadas, mostrar notificaciones
+      // Si hay acciones ejecutadas, mostrar notificaciones y disparar eventos
       if (data.actions) {
         data.actions.forEach((action: any) => {
           if (action.type === "quote_created") {
             toast.success(`✅ Cotización ${action.data.id} creada exitosamente`)
+            // Disparar evento para actualizar páginas
+            window.dispatchEvent(new CustomEvent('quoteCreated', { detail: action.data }))
           } else if (action.type === "invoice_created") {
             toast.success(`✅ Factura ${action.data.id} creada exitosamente`)
+            // Disparar evento para actualizar páginas
+            window.dispatchEvent(new CustomEvent('invoiceCreated', { detail: action.data }))
           } else if (action.type === "status_updated") {
-            toast.success(`✅ Estado actualizado a ${action.data.status}`)
+            toast.success(`✅ Estado actualizado`)
+            // Disparar evento para actualizar páginas según el tipo de documento
+            if (action.data.quoteId) {
+              window.dispatchEvent(new CustomEvent('quoteStatusUpdated', { detail: action.data }))
+            } else if (action.data.invoiceId) {
+              window.dispatchEvent(new CustomEvent('invoiceStatusUpdated', { detail: action.data }))
+            }
           } else if (action.type === "email_sent") {
             toast.success(`📧 ${action.data.message}`)
           }

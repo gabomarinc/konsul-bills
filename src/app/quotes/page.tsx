@@ -66,16 +66,23 @@ export default function QuotesPage() {
   const [q, setQ] = useState("")
   const [status, setStatus] = useState<Quote["status"] | "all">("all")
   
-  // Escuchar eventos de creación de cotizaciones desde el chatbot
+  // Escuchar eventos de creación y actualización de cotizaciones desde el chatbot
   useEffect(() => {
     const handleQuoteCreated = () => {
       invalidateQuotes()
       toast.success("Cotización creada exitosamente")
     }
     
+    const handleQuoteStatusUpdated = () => {
+      invalidateQuotes()
+      // No mostrar toast adicional, el chatbot ya lo mostró
+    }
+    
     window.addEventListener('quoteCreated', handleQuoteCreated)
+    window.addEventListener('quoteStatusUpdated', handleQuoteStatusUpdated)
     return () => {
       window.removeEventListener('quoteCreated', handleQuoteCreated)
+      window.removeEventListener('quoteStatusUpdated', handleQuoteStatusUpdated)
     }
   }, [invalidateQuotes])
 

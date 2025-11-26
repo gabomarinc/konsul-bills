@@ -293,13 +293,20 @@ IMPORTANTE:
       }
 
       aiResponse = await response.json()
-      const choice = aiResponse.choices[0]
+      const choice = aiResponse.choices?.[0]
 
-      if (choice.message.function_calls) {
+      if (choice?.message?.function_calls) {
         functionCalls = choice.message.function_calls.map((fc: any) => ({
           name: fc.name,
           arguments: fc.arguments
         }))
+      } else if (choice?.message?.function_call) {
+        functionCalls = [
+          {
+            name: choice.message.function_call.name,
+            arguments: choice.message.function_call.arguments
+          }
+        ]
       }
     } else if (GEMINI_API_KEY) {
       console.log('[Chat API] Usando Gemini')

@@ -968,28 +968,52 @@ function normalizeText(text: string) {
 function detectDirectListRequest(
   normalizedMessage: string
 ): { functionName: "list_clients" | "list_quotes" | "list_invoices"; responseMessage: string } | null {
-  const listKeywords = ["lista", "listado", "muestrame", "muestreme", "mostrar", "mostrame", "ver", "ensename", "enseneme", "dame", "quiero ver", "quiero la", "quiero el"]
+  const listKeywords = [
+    "lista",
+    "listado",
+    "muestrame",
+    "muestreme",
+    "mostrar",
+    "mostrame",
+    "ver",
+    "ensename",
+    "enseneme",
+    "dame",
+    "quiero ver",
+    "quiero la",
+    "quiero el",
+    "mis",
+    "todas",
+    "toda",
+    "tus",
+    "las"
+  ]
   const hasListIntent = listKeywords.some(keyword => normalizedMessage.includes(keyword))
+  const isShortRequest = normalizedMessage.length <= 40
 
-  if (!hasListIntent) {
+  const wantsQuotes = normalizedMessage.includes("cotiz")
+  const wantsInvoices = normalizedMessage.includes("factur")
+  const wantsClients = normalizedMessage.includes("cliente")
+
+  if (!(hasListIntent || isShortRequest)) {
     return null
   }
 
-  if (normalizedMessage.includes("cotiz")) {
+  if (wantsQuotes) {
     return {
       functionName: "list_quotes",
       responseMessage: "¡Claro! Aquí tienes la lista de tus cotizaciones recientes. 😊"
     }
   }
 
-  if (normalizedMessage.includes("factur")) {
+  if (wantsInvoices) {
     return {
       functionName: "list_invoices",
       responseMessage: "¡Por supuesto! Estas son tus facturas más recientes."
     }
   }
 
-  if (normalizedMessage.includes("cliente")) {
+  if (wantsClients) {
     return {
       functionName: "list_clients",
       responseMessage: "Con gusto, aquí tienes el listado de tus clientes."

@@ -41,18 +41,19 @@ export async function GET(
     // Crear PDF
     const doc = new jsPDF()
     
-    // Configuración de colores
-    const darkBlue: [number, number, number] = [30, 58, 138] // azul oscuro para encabezados
+    // Configuración de colores exactos del ejemplo
+    const darkBlue: [number, number, number] = [30, 58, 138] // azul oscuro para encabezados de tabla
+    const lightGray: [number, number, number] = [156, 163, 175] // gris claro para "FACTURA"
+    const darkGray: [number, number, number] = [31, 41, 55] // gris oscuro para número
     const green: [number, number, number] = [34, 197, 94] // verde para total
-    const textColor: [number, number, number] = [15, 23, 42] // slate-900
-    const lightGray: [number, number, number] = [241, 245, 249] // slate-100
-    const grayText: [number, number, number] = [100, 116, 139] // slate-500
+    const textColor: [number, number, number] = [17, 24, 39] // casi negro para texto principal
+    const grayText: [number, number, number] = [107, 114, 128] // gris para texto secundario
     const red: [number, number, number] = [220, 38, 38] // rojo para pendiente
 
     // ========== HEADER ==========
     let yPos = 20
     
-    // Logo a la izquierda
+    // Logo a la izquierda (si existe)
     if (logoUrl) {
       try {
         const base64Data = logoUrl.includes(',') ? logoUrl.split(',')[1] : logoUrl
@@ -64,58 +65,62 @@ export async function GET(
       }
     }
 
-    // Título "FACTURA" y número a la derecha
-    doc.setFontSize(28)
-    doc.setTextColor(...darkBlue)
-    doc.setFont("helvetica", "bold")
+    // "FACTURA" en gris claro a la derecha
     const pageWidth = doc.internal.pageSize.width
-    doc.text("FACTURA", pageWidth - 20, yPos + 8, { align: "right" })
-    
-    doc.setFontSize(12)
-    doc.setTextColor(...textColor)
+    doc.setFontSize(16)
+    doc.setTextColor(...lightGray)
     doc.setFont("helvetica", "normal")
-    doc.text(invoice.id, pageWidth - 20, yPos + 15, { align: "right" })
+    doc.text("FACTURA", pageWidth - 20, yPos + 5, { align: "right" })
+    
+    // Número de factura en gris oscuro más grande
+    doc.setFontSize(18)
+    doc.setTextColor(...darkGray)
+    doc.setFont("helvetica", "bold")
+    doc.text(invoice.id, pageWidth - 20, yPos + 12, { align: "right" })
 
     // ========== INFORMACIÓN DE LA EMPRESA ==========
-    yPos = 45
+    yPos = 50
     const companyName = invoice.Company.name
-    const companyAddress = settings 
-      ? [settings.addressLine1, settings.addressLine2, settings.city, settings.state, settings.zip, settings.country]
-          .filter(Boolean)
-          .join(", ")
-      : ""
     
-    doc.setFontSize(14)
+    doc.setFontSize(16)
     doc.setTextColor(...textColor)
     doc.setFont("helvetica", "bold")
     doc.text(companyName, 20, yPos)
     
     yPos += 7
+    yPos += 3
+    doc.setFontSize(10)
+    doc.setTextColor(...grayText)
+    doc.setFont("helvetica", "normal")
+    
     if (settings?.emailFrom) {
-      doc.setFontSize(10)
-      doc.setTextColor(...grayText)
-      doc.setFont("helvetica", "normal")
       doc.text(`Email: ${settings.emailFrom}`, 20, yPos)
       yPos += 5
     }
     if (settings?.phone) {
-      doc.text(`Teléfono: ${settings.phone}`, 20, yPos)
+      doc.text(`Phone: ${settings.phone}`, 20, yPos)
       yPos += 5
     }
     if (settings?.website) {
       doc.text(`Website: ${settings.website}`, 20, yPos)
       yPos += 5
     }
+    
+    const companyAddress = settings 
+      ? [settings.addressLine1, settings.addressLine2, settings.city, settings.state, settings.zip, settings.country]
+          .filter(Boolean)
+          .join(", ")
+      : ""
     if (companyAddress) {
-      doc.text(`Dirección: ${companyAddress}`, 20, yPos)
+      doc.text(`Address: ${companyAddress}`, 20, yPos)
       yPos += 5
     }
     if (settings?.taxId) {
-      doc.text(`ID Fiscal: ${settings.taxId}`, 20, yPos)
+      doc.text(`Tax ID: ${settings.taxId}`, 20, yPos)
     }
 
     // ========== INFORMACIÓN DEL CLIENTE ==========
-    const clientStartY = 45
+    const clientStartY = 50
     let clientY = clientStartY
     
     doc.setFontSize(12)
@@ -130,7 +135,7 @@ export async function GET(
     
     if (invoice.Client.email) {
       clientY += 6
-      doc.setFontSize(9)
+      doc.setFontSize(10)
       doc.setTextColor(...grayText)
       doc.text(invoice.Client.email, pageWidth - 20, clientY, { align: "right" })
     }
@@ -140,32 +145,34 @@ export async function GET(
     }
 
     // ========== FECHAS ==========
-    yPos = Math.max(yPos, clientY) + 15
+    yPos = Math.max(yPos, clientY) + 20
     doc.setFontSize(10)
     doc.setTextColor(...textColor)
-    doc.setFont("helvetica", "bold")
-    doc.text("FECHA DE EMISIÓN:", 20, yPos)
     doc.setFont("helvetica", "normal")
-    doc.text(new Date(invoice.issueDate).toLocaleDateString("es-ES", { 
+    
+    // FECHA DE EMISIÓN
+    doc.text("FECHA DE EMISIÓN:", 20, yPos)
+    const issueDate = new Date(invoice.issueDate).toLocaleDateString("es-ES", { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
-    }), 75, yPos)
+    })
+    doc.text(issueDate, 20 + 50, yPos)
     
+    // VENCIMIENTO
     if (invoice.dueDate) {
       yPos += 6
-      doc.setFont("helvetica", "bold")
       doc.text("VENCIMIENTO:", 20, yPos)
-      doc.setFont("helvetica", "normal")
-      doc.text(new Date(invoice.dueDate).toLocaleDateString("es-ES", { 
+      const dueDate = new Date(invoice.dueDate).toLocaleDateString("es-ES", { 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric' 
-      }), 75, yPos)
+      })
+      doc.text(dueDate, 20 + 50, yPos)
     }
 
     // ========== TABLA DE ITEMS ==========
-    yPos += 12
+    yPos += 15
     const tableData = invoice.InvoiceItem.map(item => [
       item.description,
       item.qty.toString(),
@@ -188,13 +195,11 @@ export async function GET(
         fillColor: darkBlue,
         textColor: [255, 255, 255],
         fontStyle: "bold",
-        fontSize: 10,
-        halign: "left"
+        fontSize: 10
       },
       bodyStyles: {
         textColor: textColor,
-        fontSize: 10,
-        halign: "left"
+        fontSize: 10
       },
       columnStyles: {
         0: { cellWidth: 100, halign: "left" },
@@ -210,87 +215,73 @@ export async function GET(
     })
 
     // ========== TOTALES ==========
-    const finalY = (doc as any).lastAutoTable.finalY + 10
-    
-    // Caja de totales con fondo gris claro
-    const totalsBoxX = 120
-    const totalsBoxY = finalY - 5
-    const totalsBoxWidth = 70
-    let totalsBoxHeight = 30
-    
-    // Ajustar altura si hay balance pendiente
-    if (invoice.balanceDue > 0 && invoice.balanceDue !== invoice.total) {
-      totalsBoxHeight = 37
-    }
-    
-    doc.setFillColor(...lightGray)
-    doc.roundedRect(totalsBoxX, totalsBoxY, totalsBoxWidth, totalsBoxHeight, 3, 3, 'F')
+    const finalY = (doc as any).lastAutoTable.finalY + 15
     
     // Subtotal
     doc.setFontSize(10)
     doc.setTextColor(...textColor)
     doc.setFont("helvetica", "normal")
-    doc.text("Subtotal:", totalsBoxX + 5, totalsBoxY + 8)
+    const totalsX = pageWidth - 20
+    doc.text("Subtotal:", totalsX - 60, finalY, { align: "right" })
     doc.text(
       new Intl.NumberFormat("es-ES", {
         style: "currency",
         currency: invoice.currency as "EUR" | "USD"
-      }).format(invoice.subtotal),
-      totalsBoxX + totalsBoxWidth - 5,
-      totalsBoxY + 8,
+      }).format(invoice.subtotal) + ` ${invoice.currency}`,
+      totalsX,
+      finalY,
       { align: "right" }
     )
     
-    // Impuestos
+    // Impuestos si aplica
     if (invoice.tax > 0) {
-      doc.text(`Impuestos (${invoice.tax}%):`, totalsBoxX + 5, totalsBoxY + 14)
+      doc.text(`Impuestos (${invoice.tax}%):`, totalsX - 60, finalY + 6, { align: "right" })
       doc.text(
         new Intl.NumberFormat("es-ES", {
           style: "currency",
           currency: invoice.currency as "EUR" | "USD"
-        }).format(invoice.taxAmount),
-        totalsBoxX + totalsBoxWidth - 5,
-        totalsBoxY + 14,
+        }).format(invoice.taxAmount) + ` ${invoice.currency}`,
+        totalsX,
+        finalY + 6,
         { align: "right" }
       )
     }
     
-    // Total destacado en verde
-    let totalY = totalsBoxY + 20
+    // Total en verde
     doc.setFont("helvetica", "bold")
     doc.setFontSize(12)
     doc.setTextColor(...green)
-    doc.text("TOTAL", totalsBoxX + 5, totalY)
+    const totalY = invoice.tax > 0 ? finalY + 14 : finalY + 8
+    doc.text("TOTAL:", totalsX - 60, totalY, { align: "right" })
     doc.text(
       new Intl.NumberFormat("es-ES", {
         style: "currency",
         currency: invoice.currency as "EUR" | "USD"
-      }).format(invoice.total),
-      totalsBoxX + totalsBoxWidth - 5,
+      }).format(invoice.total) + ` ${invoice.currency}`,
+      totalsX,
       totalY,
       { align: "right" }
     )
     
     // Balance pendiente si aplica
     if (invoice.balanceDue > 0 && invoice.balanceDue !== invoice.total) {
-      totalY += 7
       doc.setFont("helvetica", "bold")
       doc.setFontSize(10)
       doc.setTextColor(...red)
-      doc.text("PENDIENTE:", totalsBoxX + 5, totalY)
+      doc.text("PENDIENTE:", totalsX - 60, totalY + 8, { align: "right" })
       doc.text(
         new Intl.NumberFormat("es-ES", {
           style: "currency",
           currency: invoice.currency as "EUR" | "USD"
-        }).format(invoice.balanceDue),
-        totalsBoxX + totalsBoxWidth - 5,
-        totalY,
+        }).format(invoice.balanceDue) + ` ${invoice.currency}`,
+        totalsX,
+        totalY + 8,
         { align: "right" }
       )
     }
 
     // ========== NOTAS Y CONDICIONES ==========
-    let notesY = totalsBoxY + totalsBoxHeight + 15
+    let notesY = totalY + (invoice.balanceDue > 0 && invoice.balanceDue !== invoice.total ? 20 : 15)
     if (invoice.notes) {
       doc.setFontSize(11)
       doc.setTextColor(...textColor)
@@ -305,11 +296,9 @@ export async function GET(
       // Dividir notas por líneas y agregar bullet points
       const notesLines = invoice.notes.split('\n').filter(line => line.trim())
       notesLines.forEach((line, index) => {
-        const bullet = line.trim().startsWith('•') || line.trim().startsWith('-') ? '' : '• '
-        doc.text(`${bullet}${line.trim()}`, 20, notesY + (index * 5))
+        const cleanLine = line.trim().replace(/^[•\-\*]\s*/, '')
+        doc.text(`• ${cleanLine}`, 20, notesY + (index * 5))
       })
-      
-      notesY += notesLines.length * 5 + 5
     }
 
     // ========== FOOTER ==========
@@ -318,22 +307,11 @@ export async function GET(
     doc.setTextColor(...grayText)
     doc.setFont("helvetica", "normal")
     
-    // Línea separadora
-    doc.setDrawColor(...lightGray)
-    doc.setLineWidth(0.5)
-    doc.line(20, pageHeight - 25, pageWidth - 20, pageHeight - 25)
-    
     // Texto del footer centrado
-    const footerText = `${companyName} - Gracias por confiar en nosotros`
-    doc.text(footerText, pageWidth / 2, pageHeight - 15, { align: "center" })
+    const footerText1 = `${companyName} - Transformando ideas en soluciones digitales`
+    doc.text(footerText1, pageWidth / 2, pageHeight - 15, { align: "center" })
     
-    doc.setFontSize(7)
-    doc.text(
-      `Generado el ${new Date().toLocaleDateString("es-ES")}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: "center" }
-    )
+    doc.text("Gracias por confiar en nosotros", pageWidth / 2, pageHeight - 10, { align: "center" })
 
     // Generar respuesta
     const pdfBuffer = Buffer.from(doc.output("arraybuffer"))

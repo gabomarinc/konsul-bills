@@ -769,37 +769,86 @@ const handleDiscardPending = async (id: string) => {
               <div className="space-y-4">
                 {/* Logo Upload */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">
+                  <label className="block text-sm font-medium mb-3 text-slate-700">
                     {t.settings.companyLogo || "Logo de la Empresa"}
                   </label>
                   <div className="mt-2">
                     {businessSettings.logoUrl ? (
-                      <div className="relative inline-block">
-                        <div className="relative w-32 h-32 border-2 border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center">
+                      <div className="relative inline-block group">
+                        <div className="relative w-40 h-40 border-2 border-slate-200 rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:border-slate-300">
                           <img
                             src={businessSettings.logoUrl}
                             alt="Company Logo"
-                            className="max-w-full max-h-full object-contain"
+                            className="max-w-full max-h-full object-contain p-2"
                           />
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 hover:bg-red-600 text-white p-0"
+                          className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-red-500 hover:bg-red-600 text-white p-0 shadow-lg transition-all duration-200 hover:scale-110"
                           onClick={() => setBusinessSettings(prev => ({ ...prev, logoUrl: null }))}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-4 w-4" />
                         </Button>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 rounded-xl transition-colors duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-slate-700 bg-white/90 hover:bg-white shadow-md"
+                            onClick={() => {
+                              const input = document.createElement('input')
+                              input.type = 'file'
+                              input.accept = 'image/png,image/jpeg,image/jpg'
+                              input.onchange = (e: any) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                  if (file.size > 2 * 1024 * 1024) {
+                                    toast.error("El archivo es demasiado grande. Máximo 2MB.")
+                                    return
+                                  }
+                                  if (!file.type.startsWith('image/')) {
+                                    toast.error("Por favor, sube una imagen válida.")
+                                    return
+                                  }
+                                  const reader = new FileReader()
+                                  reader.onloadend = () => {
+                                    const base64String = reader.result as string
+                                    setBusinessSettings(prev => ({ ...prev, logoUrl: base64String }))
+                                  }
+                                  reader.onerror = () => {
+                                    toast.error("Error al leer el archivo.")
+                                  }
+                                  reader.readAsDataURL(file)
+                                }
+                              }
+                              input.click()
+                            }}
+                          >
+                            Cambiar logo
+                          </Button>
+                        </div>
                       </div>
                     ) : (
-                      <label className="flex flex-col items-center justify-center w-32 h-32 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <ImageIcon className="w-10 h-10 mb-2 text-slate-400" />
-                          <p className="mb-2 text-sm text-slate-500">
-                            <span className="font-semibold">Click para subir</span> o arrastra
+                      <label className="flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-slate-50 transition-all duration-300 group bg-gradient-to-br from-slate-50 to-white shadow-sm hover:shadow-md">
+                        <div className="flex flex-col items-center justify-center pt-6 pb-6 px-6">
+                          <div className="relative mb-4">
+                            <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                            <div className="relative p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
+                              <ImageIcon className="w-8 h-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
+                            </div>
+                          </div>
+                          <p className="mb-1 text-sm font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">
+                            Click para subir o arrastra tu logo
                           </p>
-                          <p className="text-xs text-slate-500">PNG, JPG (MAX. 2MB)</p>
+                          <p className="text-xs text-slate-500 group-hover:text-slate-600">
+                            PNG, JPG hasta 2MB
+                          </p>
+                          <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                            <Upload className="w-4 h-4" />
+                            <span>Arrastra y suelta aquí</span>
+                          </div>
                         </div>
                         <input
                           type="file"
@@ -823,6 +872,7 @@ const handleDiscardPending = async (id: string) => {
                               reader.onloadend = () => {
                                 const base64String = reader.result as string
                                 setBusinessSettings(prev => ({ ...prev, logoUrl: base64String }))
+                                toast.success("Logo subido exitosamente")
                               }
                               reader.onerror = () => {
                                 toast.error("Error al leer el archivo.")
@@ -834,7 +884,8 @@ const handleDiscardPending = async (id: string) => {
                       </label>
                     )}
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
                     El logo aparecerá en tus cotizaciones y facturas PDF
                   </p>
                 </div>

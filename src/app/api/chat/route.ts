@@ -137,10 +137,11 @@ Puedes realizar las siguientes acciones usando function calling:
 IMPORTANTE - CAMBIOS DE ESTADO:
 - Cuando el usuario pida cambiar el estado de una cotización o factura, DEBES usar update_quote_status o update_invoice_status.
 - El usuario puede usar lenguaje natural como: "acepta la cotización", "marca como aceptada", "cambia a aceptada", "pon en enviado", "marca como pagada", etc.
+- CRÍTICO PARA FACTURAS: Si el usuario dice "aceptada" o "acepta" para una FACTURA, debes usar el estado "paid" (pagada). Las facturas NO tienen estado "accepted", solo las cotizaciones.
 - Si dice "la última cotización", "la última factura", "la más reciente", usa el ID de la primera en la lista (la más reciente).
 - Si menciona un ID específico (como Q-00009, INV-00005), usa ese ID exacto.
 - Estados válidos para cotizaciones: "draft" (borrador), "sent" (enviada), "accepted" (aceptada), "rejected" (rechazada).
-- Estados válidos para facturas: "draft" (borrador), "sent" (enviada), "paid" (pagada), "overdue" (vencida), "cancelled" (cancelada).
+- Estados válidos para facturas: "draft" (borrador), "sent" (enviada), "paid" (pagada/aceptada), "overdue" (vencida), "cancelled" (cancelada).
 - NO listes las cotizaciones cuando el usuario pide cambiar un estado. Ejecuta directamente el cambio de estado.
 
 IMPORTANTE - LISTADOS:
@@ -228,7 +229,7 @@ IMPORTANTE - CREACIÓN:
       },
       {
         name: "update_invoice_status",
-        description: "Cambiar el estado de una factura. Usa esta función cuando el usuario pida marcar como pagada, enviar, cancelar o cambiar el estado de una factura. Si dice 'la última' o 'la más reciente', usa el ID de la factura más reciente de la lista proporcionada.",
+        description: "Cambiar el estado de una factura. Usa esta función cuando el usuario pida marcar como pagada, aceptada, enviar, cancelar o cambiar el estado de una factura. IMPORTANTE: Si el usuario dice 'aceptada' para una factura, usa 'paid' (pagada). Si dice 'la última' o 'la más reciente', usa el ID de la factura más reciente de la lista proporcionada.",
         parameters: {
           type: "object",
           properties: {
@@ -239,7 +240,7 @@ IMPORTANTE - CREACIÓN:
             status: { 
               type: "string", 
               enum: ["draft", "sent", "paid", "overdue", "cancelled"], 
-              description: "Nuevo estado. 'paid' para pagada, 'sent' para enviada, 'cancelled' para cancelada, 'overdue' para vencida, 'draft' para borrador." 
+              description: "Nuevo estado. 'paid' para pagada/aceptada, 'sent' para enviada, 'cancelled' para cancelada, 'overdue' para vencida, 'draft' para borrador. NOTA: Si el usuario dice 'aceptada', usa 'paid'." 
             }
           },
           required: ["invoiceId", "status"]
@@ -601,6 +602,11 @@ Ejemplo de respuesta cuando tienes toda la info:
           if (args.newStatus && !args.status) {
             args.status = args.newStatus
             delete args.newStatus
+          }
+          // Normalizar estado: si viene "accepted" para una factura, cambiarlo a "paid"
+          if (args.status && args.status.toLowerCase() === "accepted") {
+            args.status = "paid"
+            console.log('[Chat API] Normalizando estado: accepted -> paid para factura')
           }
           // Resolver IDs cuando el usuario dice "la última" o similar
           if (!args.invoiceId) {

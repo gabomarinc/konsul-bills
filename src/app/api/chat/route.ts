@@ -663,30 +663,24 @@ Ejemplo de respuesta cuando tienes toda la info:
                       responseMessage.includes('list_clients(')
       
       if (hasCode) {
-        // Intentar extraer solo el texto antes del código/JSON
-        const textMatch = responseMessage.match(/(.*?)(?:```|print\(|tool_code|list_\w+\(|function_calls|\{[\s\S]*function_calls)/i)
-        if (textMatch && textMatch[1].trim()) {
-          responseMessage = textMatch[1].trim()
-        } else {
-          // Si no hay texto antes, eliminar todo el código y JSON
-          responseMessage = responseMessage
-            .replace(/```[\s\S]*?```/gi, '') // Eliminar bloques de código
-            .replace(/print\([^)]*\)/gi, '') // Eliminar llamadas print()
-            .replace(/tool_code[\s\S]*?$/gi, '') // Eliminar tool_code
-            .replace(/list_\w+\([^)]*\)/gi, '') // Eliminar llamadas a funciones list_*
-            .replace(/```json[\s\S]*?```/gi, '')
-            .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
-            .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
-            .replace(/\[[\s\S]*?\]/g, '') // Eliminar arrays JSON
-            .replace(/\{[\s\S]*?\}/g, '') // Eliminar cualquier objeto JSON restante
-            .replace(/^[\s\}\]]+$/gm, '') // Eliminar líneas que solo contengan llaves o corchetes
-            .replace(/[\}\]]+/g, '') // Eliminar llaves y corchetes sueltos
-            .trim()
-          
-          // Si después de limpiar queda vacío o solo tiene caracteres especiales, usar mensaje vacío
-          if (!responseMessage || /^[\s\}\]]+$/.test(responseMessage)) {
-            responseMessage = ""
-          }
+        // Eliminar bloques tool_code completos (incluyendo el label)
+        responseMessage = responseMessage
+          .replace(/tool_code[\s\S]*?(?=\n\n|\n[A-Z]|$)/gi, '') // Eliminar tool_code y todo lo que sigue hasta el final o nueva línea
+          .replace(/```[\s\S]*?```/gi, '') // Eliminar bloques de código
+          .replace(/print\([^)]*\)/gi, '') // Eliminar llamadas print()
+          .replace(/list_\w+\([^)]*\)/gi, '') // Eliminar llamadas a funciones list_*
+          .replace(/```json[\s\S]*?```/gi, '')
+          .replace(/\{[\s\S]*?function_calls[\s\S]*?\}/gi, '')
+          .replace(/\{[\s\S]*?"name"[\s\S]*?"arguments"[\s\S]*?\}/gi, '')
+          .replace(/\[[\s\S]*?\]/g, '') // Eliminar arrays JSON
+          .replace(/\{[\s\S]*?\}/g, '') // Eliminar cualquier objeto JSON restante
+          .replace(/^[\s\}\]]+$/gm, '') // Eliminar líneas que solo contengan llaves o corchetes
+          .replace(/[\}\]]+/g, '') // Eliminar llaves y corchetes sueltos
+          .trim()
+        
+        // Si después de limpiar queda vacío o solo tiene caracteres especiales, usar mensaje vacío
+        if (!responseMessage || /^[\s\}\]]+$/.test(responseMessage)) {
+          responseMessage = ""
         }
       }
     }
@@ -722,20 +716,47 @@ Ejemplo de respuesta cuando tienes toda la info:
         }
       }
     } else if (hasListActions) {
-      // Si hay listas, SIEMPRE reemplazar el mensaje con uno amigable
+      // Si hay listas, SIEMPRE reemplazar el mensaje con uno amigable (ignorar cualquier código residual)
       const listAction = executedActions.find(a => 
         ["clients_listed", "quotes_listed", "invoices_listed"].includes(a.type)
       )
       if (listAction) {
+        // Extraer el nombre del cliente de los argumentos si está disponible
+        let clientName: string | null = null
+        const listFunctionCall = functionCalls.find(fc => 
+          ["list_quotes", "list_invoices"].includes(fc.name)
+        )
+        if (listFunctionCall) {
+          try {
+            let args = listFunctionCall.arguments
+            if (typeof args === 'string') {
+              args = JSON.parse(args)
+            }
+            if (args && args.clientName) {
+              clientName = args.clientName
+            }
+          } catch (e) {
+            // Ignorar errores de parsing
+          }
+        }
+        
         if (listAction.type === "clients_listed") {
           const count = listAction.data?.clients?.length || 0
           responseMessage = `¡Perfecto! Aquí tienes tu lista de clientes${count > 0 ? ` (${count} ${count === 1 ? 'cliente' : 'clientes'})` : ''}:`
         } else if (listAction.type === "quotes_listed") {
           const count = listAction.data?.quotes?.length || 0
-          responseMessage = `¡Claro! Aquí tienes las cotizaciones${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
+          if (clientName) {
+            responseMessage = `¡Claro! Aquí tienes las cotizaciones para ${clientName}${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
+          } else {
+            responseMessage = `¡Claro! Aquí tienes las cotizaciones${count > 0 ? ` (${count} ${count === 1 ? 'cotización' : 'cotizaciones'})` : ''}:`
+          }
         } else if (listAction.type === "invoices_listed") {
           const count = listAction.data?.invoices?.length || 0
-          responseMessage = `¡Claro! Aquí tienes las facturas${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
+          if (clientName) {
+            responseMessage = `¡Claro! Aquí tienes las facturas para ${clientName}${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
+          } else {
+            responseMessage = `¡Claro! Aquí tienes las facturas${count > 0 ? ` (${count} ${count === 1 ? 'factura' : 'facturas'})` : ''}:`
+          }
         }
       }
     } else {

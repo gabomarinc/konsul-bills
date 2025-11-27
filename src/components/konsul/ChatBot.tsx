@@ -394,7 +394,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
       <Button
         onClick={() => setIsMinimized(false)}
         className="rounded-full h-14 w-14 shadow-xl bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all duration-200 hover:scale-105"
-        aria-label="Abrir asistente de IA"
+        aria-label="Abrir Axel"
       >
         <Bot className="h-6 w-6 text-white" />
       </Button>
@@ -412,7 +412,7 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-base">Asistente IA</h3>
+              <h3 className="font-semibold text-base">Axel</h3>
               <p className="text-xs text-blue-100">Konsul Bills</p>
             </div>
           </div>

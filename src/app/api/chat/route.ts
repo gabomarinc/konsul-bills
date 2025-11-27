@@ -154,7 +154,11 @@ IMPORTANTE - LISTADOS:
 - Responde de forma amigable y natural, sin mostrar JSON ni datos técnicos. El sistema mostrará las listas de forma visual automáticamente.
 
 IMPORTANTE - CREACIÓN:
-- Cuando el usuario pida crear algo, extrae toda la información posible y usa las funciones correspondientes.`
+- Cuando el usuario pida CREAR una cotización o factura (ej: "crear cotización", "nueva cotización", "quiero crear una cotización", "hacer una factura"), DEBES usar create_quote o create_invoice.
+- NO uses list_quotes o list_invoices cuando el usuario pide CREAR algo nuevo.
+- Si el usuario no proporciona toda la información necesaria (cliente, título, items), pregunta por los datos faltantes de forma amigable.
+- Para crear una cotización mínima, necesitas al menos: clientName, title, y items (o amount como alternativa).
+- Si el usuario solo proporciona un monto y descripción, crea un item automáticamente con esa información.`
 
     const functions = [
       {
@@ -1258,6 +1262,15 @@ function detectDirectListRequest(
         break
       }
     }
+  }
+
+  // Excluir solicitudes de creación
+  const createKeywords = ["crear", "nueva", "nuevo", "nuevas", "nuevos", "generar", "hacer"]
+  const hasCreateIntent = createKeywords.some(keyword => normalizedMessage.includes(keyword))
+  
+  // Si es una solicitud de creación, NO usar detección directa, dejar que la IA lo procese
+  if (hasCreateIntent) {
+    return null
   }
 
   const wantsQuotes = normalizedMessage.includes("cotiz")

@@ -1,11 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useTranslation } from "@/contexts/LanguageContext"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog"
+import {
   User, 
   Building2, 
   Bell, 
@@ -15,50 +25,43 @@ import {
   Smartphone,
   FileText,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  CreditCard,
+  MessageCircle,
+  CheckCircle2,
+  Upload,
+  X,
+  Image as ImageIcon
 } from "lucide-react"
-// import ProfileOnboardingModal from "@/components/konsul/ProfileOnboardingModal"
+import { toast } from "sonner"
+import GmailIntegrationWizard from "@/components/konsul/GmailIntegrationWizard"
 
-// Tipo para los datos del onboarding
-type OnboardingData = {
-  role?: string
-  yearsExperience?: number
-  seniority?: string
-  skills?: string
-  location?: string
-  availability?: string
-  contributionType?: string
-  certifications?: string
-  portfolioUrl?: string
-  billingMethod?: string
-  currentHourlyRate?: number
-  targetHourlyRate?: number
-  currentProjectRate?: number
-  targetProjectRate?: number
-  lastProjectDetails?: string
-  lastProjectRate?: number
-  minProjectRate?: number
-  marketAnalysis?: string
-  pricingRecommendations?: string
-}
 
 export default function SettingsPage() {
+  const { t } = useTranslation()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [profileSettings, setProfileSettings] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john@company.com",
-    companyName: "Acme Inc.",
-    phone: "+1 (555) 123-4567",
-    timezone: "Eastern Standard Time"
+    firstName: "",
+    lastName: "",
+    email: "",
+    companyName: "",
+    phone: "",
+    timezone: "Europe/Madrid"
   })
 
   const [businessSettings, setBusinessSettings] = useState({
-    businessAddress: "123 Business St, Suite 100, New York, NY 10001",
-    taxId: "12-3456789",
-    defaultCurrency: "USD",
-    defaultTaxRate: 10.00,
-    defaultPaymentTerms: "Net 30 days"
+    businessAddress: "",
+    taxId: "",
+    defaultCurrency: "EUR",
+    defaultTaxRate: 21.00,
+    defaultPaymentTerms: "Net 30 días",
+    logoUrl: null as string | null
   })
+
+  const [loadingProfile, setLoadingProfile] = useState(false)
+  const [loadingBusiness, setLoadingBusiness] = useState(false)
+  const [loadingData, setLoadingData] = useState(true)
 
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
@@ -71,17 +74,308 @@ export default function SettingsPage() {
 
   const [integrations, setIntegrations] = useState({
     gmail: false,
-    geminiAI: true
+    geminiAI: true,
+    stripe: false
   })
 
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false)
+  const [stripeSettings, setStripeSettings] = useState({
+    enabled: false,
+    secretKey: "",
+    publishableKey: ""
+  })
 
-  const handleProfileUpdate = () => {
-    console.log("Updating profile:", profileSettings)
+  const [stripeDialogOpen, setStripeDialogOpen] = useState(false)
+
+  const [telegramSettings, setTelegramSettings] = useState({
+    linked: false,
+    telegramId: "",
+    username: "",
+    firstName: "",
+    lastName: ""
+  })
+
+const [telegramDialogOpen, setTelegramDialogOpen] = useState(false)
+const [telegramIdInput, setTelegramIdInput] = useState("")
+
+type PendingQuote = {
+  id: string
+  emailSubject: string
+  emailFrom: string
+  emailDate: string
+  clientName?: string | null
+  clientEmail?: string | null
+  title?: string | null
+  amount?: number | null
+  currency?: string | null
+  status: string
+}
+
+const [gmailIntegration, setGmailIntegration] = useState<{
+  connected: boolean
+  email?: string
+  lastSyncAt?: string
+  pendingQuotes?: number
+}>({
+  connected: false
+})
+const [gmailWizardOpen, setGmailWizardOpen] = useState(false)
+const [pendingQuotes, setPendingQuotes] = useState<PendingQuote[]>([])
+const [loadingPending, setLoadingPending] = useState(false)
+
+const formatMoney = (amount?: number | null, currency: string = "EUR") => {
+  if (amount === undefined || amount === null) return "—"
+  try {
+    return new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency
+    }).format(amount)
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`
+  }
+}
+
+const loadPendingQuotes = async () => {
+  try {
+    setLoadingPending(true)
+    const response = await fetch("/api/gmail/pending?status=pending", {
+      credentials: "include"
+    })
+    if (response.ok) {
+      const data = await response.json()
+      setPendingQuotes(data.data || [])
+    }
+  } catch (error) {
+    console.error("Error loading pending quotes:", error)
+  } finally {
+    setLoadingPending(false)
+  }
+}
+
+const handleApprovePending = async (id: string) => {
+  try {
+    const response = await fetch(`/api/gmail/pending/${id}/approve`, {
+      method: "POST",
+      credentials: "include"
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(error.error || "Error al aprobar cotización")
+      return
+    }
+    alert("Cotización creada exitosamente")
+    await loadPendingQuotes()
+  } catch (error) {
+    console.error("Error approving pending quote:", error)
+    alert("Error al crear la cotización")
+  }
+}
+
+const handleDiscardPending = async (id: string) => {
+  try {
+    const response = await fetch(`/api/gmail/pending/${id}/discard`, {
+      method: "POST",
+      credentials: "include"
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      alert(error.error || "Error al descartar")
+      return
+    }
+    await loadPendingQuotes()
+  } catch (error) {
+    console.error("Error discarding pending quote:", error)
+  }
+}
+
+
+  // Cargar datos iniciales
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        setLoadingData(true)
+        
+        // Cargar perfil
+        const profileResponse = await fetch("/api/settings/profile", {
+          credentials: "include"
+        })
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          setProfileSettings({
+            firstName: profileData.firstName || "",
+            lastName: profileData.lastName || "",
+            email: profileData.email || "",
+            companyName: profileData.companyName || "",
+            phone: profileData.phone || "",
+            timezone: profileData.timezone || "Europe/Madrid"
+          })
+        }
+
+        // Cargar configuración de negocio
+        const businessResponse = await fetch("/api/settings/business", {
+          credentials: "include"
+        })
+        if (businessResponse.ok) {
+          const businessData = await businessResponse.json()
+          setBusinessSettings({
+            businessAddress: businessData.businessAddress || "",
+            taxId: businessData.taxId || "",
+            defaultCurrency: businessData.defaultCurrency || "EUR",
+            defaultTaxRate: businessData.defaultTaxRate ?? 21.00,
+            defaultPaymentTerms: businessData.defaultPaymentTerms || "Net 30 días",
+            logoUrl: businessData.logoUrl || null
+          })
+        }
+
+        // Cargar estado de integración Gmail
+        const gmailResponse = await fetch("/api/gmail/status", {
+          credentials: "include"
+        })
+        if (gmailResponse.ok) {
+          const gmailData = await gmailResponse.json()
+          setGmailIntegration(gmailData)
+          setIntegrations(prev => ({ ...prev, gmail: gmailData.connected }))
+          if (gmailData.connected) {
+            await loadPendingQuotes()
+          } else {
+            setPendingQuotes([])
+          }
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error)
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadSettings()
+  }, [])
+
+  // Manejar notificaciones de conexión de Gmail
+  useEffect(() => {
+    const gmailConnected = searchParams.get('gmail_connected')
+    const gmailError = searchParams.get('gmail_error')
+
+    if (gmailConnected === 'true') {
+      toast.success("✅ Gmail conectado exitosamente", {
+        description: "La integración con Gmail está activa. Ahora recibirás cotizaciones automáticamente desde tus correos.",
+        duration: 5000
+      })
+      // Recargar estado de Gmail con un pequeño delay para asegurar que se guardó
+      setTimeout(() => {
+        fetch("/api/gmail/status", { credentials: "include" })
+          .then(res => {
+            if (!res.ok) {
+              console.error("Error fetching Gmail status:", res.status)
+              return { connected: false }
+            }
+            return res.json()
+          })
+          .then(data => {
+            console.log("Gmail status after connection:", data)
+            setGmailIntegration(data)
+            setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+            if (data.connected) {
+              loadPendingQuotes()
+            } else {
+              toast.warning("⚠️ La conexión se completó pero no se detectó en el sistema", {
+                description: "Por favor, recarga la página o intenta conectar nuevamente.",
+                duration: 5000
+              })
+            }
+          })
+          .catch(error => {
+            console.error("Error loading Gmail status:", error)
+            toast.error("Error al verificar el estado de Gmail", {
+              description: "Por favor, recarga la página.",
+              duration: 5000
+            })
+          })
+      }, 1000)
+      // Limpiar query param
+      router.replace('/settings')
+    }
+
+    if (gmailError) {
+      let errorMessage = "Error al conectar Gmail"
+      switch (gmailError) {
+        case 'access_denied':
+          errorMessage = "Acceso denegado. Por favor, autoriza el acceso a Gmail."
+          break
+        case 'missing_params':
+          errorMessage = "Faltan parámetros en la respuesta de Google."
+          break
+        case 'callback_failed':
+          errorMessage = "Error al procesar la conexión. Por favor, intenta nuevamente."
+          break
+        case 'user_not_found':
+          errorMessage = "Usuario no encontrado. Por favor, inicia sesión nuevamente."
+          break
+        case 'save_failed':
+          errorMessage = "Error al guardar la integración. Por favor, intenta nuevamente."
+          break
+        case 'database_error':
+          errorMessage = "Error de base de datos. Por favor, contacta al soporte."
+          break
+        default:
+          errorMessage = `Error: ${gmailError}`
+      }
+      toast.error("❌ Error al conectar Gmail", {
+        description: errorMessage,
+        duration: 5000
+      })
+      // Limpiar query param
+      router.replace('/settings')
+    }
+  }, [searchParams, router])
+
+  const handleProfileUpdate = async () => {
+    try {
+      setLoadingProfile(true)
+      
+      const response = await fetch("/api/settings/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(profileSettings)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Error al guardar perfil")
+      }
+
+      alert("✅ Perfil actualizado exitosamente")
+    } catch (error: any) {
+      console.error("Error updating profile:", error)
+      alert(`Error: ${error.message || "Error al guardar perfil"}`)
+    } finally {
+      setLoadingProfile(false)
+    }
   }
 
-  const handleBusinessUpdate = () => {
-    console.log("Updating business settings:", businessSettings)
+  const handleBusinessUpdate = async () => {
+    try {
+      setLoadingBusiness(true)
+      
+      const response = await fetch("/api/settings/business", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(businessSettings)
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Error al guardar configuración")
+      }
+
+      alert("✅ Configuración de negocio guardada exitosamente")
+    } catch (error: any) {
+      console.error("Error updating business settings:", error)
+      alert(`Error: ${error.message || "Error al guardar configuración"}`)
+    } finally {
+      setLoadingBusiness(false)
+    }
   }
 
   const handleIntegrationToggle = (integration: string) => {
@@ -91,61 +385,172 @@ export default function SettingsPage() {
     }))
   }
 
-  const handleOnboardingComplete = (data: OnboardingData) => {
-    console.log("Profile onboarding completed:", data)
-    // TODO: Implementar guardado de datos del perfil
-    // Aquí se pueden guardar los datos en la base de datos
+  const handleStripeSave = async () => {
+    try {
+      const response = await fetch("/api/stripe/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          secretKey: stripeSettings.secretKey,
+          publishableKey: stripeSettings.publishableKey,
+          enabled: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al guardar configuración")
+      }
+
+      setStripeSettings(prev => ({ ...prev, enabled: true }))
+      setStripeDialogOpen(false)
+      console.log("Stripe configurado exitosamente")
+    } catch (error) {
+      console.error("Error saving Stripe config:", error)
+      alert("Error al guardar configuración de Stripe")
+    }
   }
+
+  // Cargar estado de Telegram al montar el componente
+  useEffect(() => {
+    const loadTelegramStatus = async () => {
+      try {
+        const response = await fetch("/api/telegram/link", {
+          credentials: "include"
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setTelegramSettings({
+            linked: data.linked,
+            telegramId: data.telegramUser?.telegramId || "",
+            username: data.telegramUser?.username || "",
+            firstName: data.telegramUser?.firstName || "",
+            lastName: data.telegramUser?.lastName || ""
+          })
+        }
+      } catch (error) {
+        console.error("Error loading Telegram status:", error)
+      }
+    }
+    loadTelegramStatus()
+  }, [])
+
+  const handleTelegramLink = async () => {
+    if (!telegramIdInput.trim()) {
+      alert("Por favor, ingresa tu Telegram ID")
+      return
+    }
+
+    try {
+      const response = await fetch("/api/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          telegramId: telegramIdInput.trim(),
+          username: telegramSettings.username,
+          firstName: telegramSettings.firstName,
+          lastName: telegramSettings.lastName
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al vincular cuenta")
+      }
+
+      const data = await response.json()
+      setTelegramSettings({
+        linked: true,
+        telegramId: data.telegramUser.telegramId,
+        username: data.telegramUser.username || "",
+        firstName: telegramSettings.firstName,
+        lastName: telegramSettings.lastName
+      })
+      setTelegramDialogOpen(false)
+      setTelegramIdInput("")
+      alert("✅ Cuenta de Telegram vinculada exitosamente")
+    } catch (error) {
+      console.error("Error linking Telegram:", error)
+      alert("Error al vincular cuenta de Telegram")
+    }
+  }
+
+  const handleTelegramUnlink = async () => {
+    if (!confirm("¿Estás seguro de que quieres desvincular tu cuenta de Telegram?")) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/telegram/link", {
+        method: "DELETE",
+        credentials: "include"
+      })
+
+      if (!response.ok) {
+        throw new Error("Error al desvincular cuenta")
+      }
+
+      setTelegramSettings({
+        linked: false,
+        telegramId: "",
+        username: "",
+        firstName: "",
+        lastName: ""
+      })
+      alert("✅ Cuenta de Telegram desvinculada")
+    } catch (error) {
+      console.error("Error unlinking Telegram:", error)
+      alert("Error al desvincular cuenta de Telegram")
+    }
+  }
+
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="p-2 bg-slate-100 rounded-lg">
               <Building2 className="h-6 w-6 text-slate-600" />
             </div>
-            <h1 className="text-3xl font-bold text-slate-900">Settings</h1>
+            <h1 className="text-3xl font-bold text-slate-900">{t.settings.title}</h1>
           </div>
-          <p className="text-slate-600 text-lg">Manage your account settings and preferences</p>
+          <p className="text-slate-600 text-lg">{t.settings.subtitle}</p>
           
-          {/* Botón Complete Your Profile */}
           <div className="mt-6">
             <p className="text-slate-600 mb-4 text-center">
-              To make your experience much better and more tailored to your industry and/or work, please fill out the form to complete your profile.
+              {t.settings.completeProfileText}
             </p>
             <Button
               type="button"
-              onClick={() => setIsOnboardingOpen(true)}
-              className="relative h-12 w-full rounded-2xl font-semibold text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all"
+              onClick={() => console.log("Onboarding clicked")}
+              disabled
+              className="relative h-12 w-full rounded-2xl font-semibold text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-sky-500 hover:from-emerald-600 hover:via-teal-600 hover:to-sky-600 shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all opacity-60 cursor-not-allowed"
             >
               <span className="absolute -top-2 -right-2 rounded-full bg-amber-400 text-amber-950 text-[10px] px-2 py-0.5 shadow ring-1 ring-amber-500/40">
-                NEW
+                En Desarrollo
               </span>
-              Complete Your Profile
+              {t.settings.completeProfileTitle}
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
           <div className="space-y-8">
-            {/* Profile Settings */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <User className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Profile Settings</h2>
-                  <p className="text-slate-600 text-sm">Update your personal information</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{t.settings.profileSettings}</h2>
+                  <p className="text-slate-600 text-sm">{t.settings.profileSubtitle}</p>
                 </div>
               </div>
               
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">First Name</label>
+                    <label className="block text-sm font-medium mb-2">{t.settings.firstName}</label>
                     <Input
                       value={profileSettings.firstName}
                       onChange={(e) => setProfileSettings(prev => ({ ...prev, firstName: e.target.value }))}
@@ -153,7 +558,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Last Name</label>
+                    <label className="block text-sm font-medium mb-2">{t.settings.lastName}</label>
                     <Input
                       value={profileSettings.lastName}
                       onChange={(e) => setProfileSettings(prev => ({ ...prev, lastName: e.target.value }))}
@@ -163,7 +568,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Email Address</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.emailAddress}</label>
                   <Input
                     type="email"
                     value={profileSettings.email}
@@ -173,7 +578,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Company Name</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.companyName}</label>
                   <Input
                     value={profileSettings.companyName}
                     onChange={(e) => setProfileSettings(prev => ({ ...prev, companyName: e.target.value }))}
@@ -182,7 +587,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Phone Number</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.phone}</label>
                   <Input
                     value={profileSettings.phone}
                     onChange={(e) => setProfileSettings(prev => ({ ...prev, phone: e.target.value }))}
@@ -191,35 +596,43 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Timezone</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.timezone}</label>
                   <select
                     value={profileSettings.timezone}
                     onChange={(e) => setProfileSettings(prev => ({ ...prev, timezone: e.target.value }))}
                     className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm mt-1"
                   >
-                    <option value="Eastern Standard Time">Eastern Standard Time</option>
-                    <option value="Central Standard Time">Central Standard Time</option>
-                    <option value="Mountain Standard Time">Mountain Standard Time</option>
-                    <option value="Pacific Standard Time">Pacific Standard Time</option>
+                    <option value="America/New_York">Eastern Time (ET)</option>
+                    <option value="America/Chicago">Central Time (CT)</option>
+                    <option value="America/Denver">Mountain Time (MT)</option>
+                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                    <option value="Europe/Madrid">Madrid (CET)</option>
+                    <option value="Europe/London">London (GMT)</option>
+                    <option value="Europe/Paris">Paris (CET)</option>
+                    <option value="America/Mexico_City">Mexico City (CST)</option>
+                    <option value="America/Buenos_Aires">Buenos Aires (ART)</option>
                     <option value="UTC">UTC</option>
                   </select>
                 </div>
               </div>
               
-              <Button onClick={handleProfileUpdate} className="mt-6 w-full bg-teal-600 hover:bg-teal-700">
-                Update Profile
+              <Button 
+                onClick={handleProfileUpdate} 
+                className="mt-6 w-full bg-teal-600 hover:bg-teal-700"
+                disabled={loadingProfile || loadingData}
+              >
+                {loadingProfile ? "Guardando..." : t.settings.updateProfile}
               </Button>
             </Card>
 
-            {/* Notifications */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <Bell className="h-5 w-5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Notifications</h2>
-                  <p className="text-slate-600 text-sm">Manage your notification preferences</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{t.settings.notificationsTitle}</h2>
+                  <p className="text-slate-600 text-sm">{t.settings.notificationsSubtitle}</p>
                 </div>
               </div>
               
@@ -229,9 +642,9 @@ export default function SettingsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 text-slate-500" />
-                        <span className="font-medium">Email Notifications</span>
+                        <span className="font-medium">{t.settings.emailNotifications}</span>
                       </div>
-                      <p className="text-sm text-slate-600">Receive updates about quotes and invoices via email</p>
+                      <p className="text-sm text-slate-600">{t.settings.emailNotificationsDesc}</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -248,9 +661,9 @@ export default function SettingsPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Smartphone className="h-4 w-4 text-slate-500" />
-                        <span className="font-medium">Push Notifications</span>
+                        <span className="font-medium">{t.settings.pushNotifications}</span>
                       </div>
-                      <p className="text-sm text-slate-600">Get instant notifications in your browser</p>
+                      <p className="text-sm text-slate-600">{t.settings.pushNotificationsDesc}</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -265,7 +678,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <h4 className="font-medium mb-3">Email Preferences</h4>
+                  <h4 className="font-medium mb-3">{t.settings.emailPreferences}</h4>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <input
@@ -275,7 +688,7 @@ export default function SettingsPage() {
                         onChange={(e) => setNotifications(prev => ({ ...prev, quoteStatusUpdates: e.target.checked }))}
                         className="h-4 w-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="quoteStatus">Quote status updates</label>
+                      <label htmlFor="quoteStatus">{t.settings.quoteStatusUpdates}</label>
                     </div>
                     <div className="flex items-center gap-3">
                       <input
@@ -285,7 +698,7 @@ export default function SettingsPage() {
                         onChange={(e) => setNotifications(prev => ({ ...prev, paymentReminders: e.target.checked }))}
                         className="h-4 w-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="paymentReminders">Payment reminders</label>
+                      <label htmlFor="paymentReminders">{t.settings.paymentReminders}</label>
                     </div>
                     <div className="flex items-center gap-3">
                       <input
@@ -295,7 +708,7 @@ export default function SettingsPage() {
                         onChange={(e) => setNotifications(prev => ({ ...prev, weeklyReports: e.target.checked }))}
                         className="h-4 w-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="weeklyReports">Weekly reports</label>
+                      <label htmlFor="weeklyReports">{t.settings.weeklyReports}</label>
                     </div>
                     <div className="flex items-center gap-3">
                       <input
@@ -305,60 +718,180 @@ export default function SettingsPage() {
                         onChange={(e) => setNotifications(prev => ({ ...prev, marketingUpdates: e.target.checked }))}
                         className="h-4 w-4 text-blue-600 bg-slate-100 border-slate-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="marketingUpdates">Marketing updates</label>
+                      <label htmlFor="marketingUpdates">{t.settings.marketingUpdates}</label>
                     </div>
                   </div>
                 </div>
               </div>
             </Card>
 
-            {/* Security & Privacy */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-orange-100 rounded-lg">
                   <Shield className="h-5 w-5 text-orange-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Security & Privacy</h2>
-                  <p className="text-slate-600 text-sm">Manage your account security settings</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{t.settings.securityTitle}</h2>
+                  <p className="text-slate-600 text-sm">{t.settings.securitySubtitle}</p>
                 </div>
               </div>
               
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium">Password</h4>
-                    <span className="text-sm text-slate-500">Last changed 3 months ago</span>
+                    <h4 className="font-medium">{t.settings.password}</h4>
+                    <span className="text-sm text-slate-500">{t.settings.lastChanged}</span>
                   </div>
-                  <Button variant="outline" size="sm">Change Password</Button>
+                  <Button variant="outline" size="sm">{t.settings.changePassword}</Button>
                 </div>
                 
                 <div>
-                  <h4 className="font-medium mb-2">Two-Factor Authentication</h4>
-                  <p className="text-sm text-slate-600 mb-3">Add an extra layer of security to your account</p>
-                  <Button variant="outline" size="sm">Enable 2FA</Button>
+                  <h4 className="font-medium mb-2">{t.settings.twoFactor}</h4>
+                  <p className="text-sm text-slate-600 mb-3">{t.settings.twoFactorDesc}</p>
+                  <Button variant="outline" size="sm">{t.settings.enable2FA}</Button>
                 </div>
               </div>
             </Card>
           </div>
 
-          {/* Right Column */}
           <div className="space-y-8">
-            {/* Business Settings */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-green-100 rounded-lg">
                   <Building2 className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Business Settings</h2>
-                  <p className="text-slate-600 text-sm">Configure your business details</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{t.settings.businessSettings}</h2>
+                  <p className="text-slate-600 text-sm">{t.settings.businessSubtitle}</p>
                 </div>
               </div>
               
               <div className="space-y-4">
+                {/* Logo Upload */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Business Address</label>
+                  <label className="block text-sm font-medium mb-3 text-slate-700">
+                    {t.settings.companyLogo || "Logo de la Empresa"}
+                  </label>
+                  <div className="mt-2">
+                    {businessSettings.logoUrl ? (
+                      <div className="relative inline-block group">
+                        <div className="relative w-40 h-40 border-2 border-slate-200 rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:border-slate-300">
+                          <img
+                            src={businessSettings.logoUrl}
+                            alt="Company Logo"
+                            className="max-w-full max-h-full object-contain p-2"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-red-500 hover:bg-red-600 text-white p-0 shadow-lg transition-all duration-200 hover:scale-110"
+                          onClick={() => setBusinessSettings(prev => ({ ...prev, logoUrl: null }))}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 rounded-xl transition-colors duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-slate-700 bg-white/90 hover:bg-white shadow-md"
+                            onClick={() => {
+                              const input = document.createElement('input')
+                              input.type = 'file'
+                              input.accept = 'image/png,image/jpeg,image/jpg'
+                              input.onchange = (e: any) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                  if (file.size > 2 * 1024 * 1024) {
+                                    toast.error("El archivo es demasiado grande. Máximo 2MB.")
+                                    return
+                                  }
+                                  if (!file.type.startsWith('image/')) {
+                                    toast.error("Por favor, sube una imagen válida.")
+                                    return
+                                  }
+                                  const reader = new FileReader()
+                                  reader.onloadend = () => {
+                                    const base64String = reader.result as string
+                                    setBusinessSettings(prev => ({ ...prev, logoUrl: base64String }))
+                                  }
+                                  reader.onerror = () => {
+                                    toast.error("Error al leer el archivo.")
+                                  }
+                                  reader.readAsDataURL(file)
+                                }
+                              }
+                              input.click()
+                            }}
+                          >
+                            Cambiar logo
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full max-w-md h-48 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50/50 hover:to-slate-50 transition-all duration-300 group bg-gradient-to-br from-slate-50 to-white shadow-sm hover:shadow-md">
+                        <div className="flex flex-col items-center justify-center pt-6 pb-6 px-6">
+                          <div className="relative mb-4">
+                            <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+                            <div className="relative p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full group-hover:from-blue-100 group-hover:to-blue-200 transition-all duration-300">
+                              <ImageIcon className="w-8 h-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
+                            </div>
+                          </div>
+                          <p className="mb-1 text-sm font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">
+                            Click para subir o arrastra tu logo
+                          </p>
+                          <p className="text-xs text-slate-500 group-hover:text-slate-600">
+                            PNG, JPG hasta 2MB
+                          </p>
+                          <div className="mt-4 flex items-center gap-2 text-xs text-slate-400">
+                            <Upload className="w-4 h-4" />
+                            <span>Arrastra y suelta aquí</span>
+                          </div>
+                        </div>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/png,image/jpeg,image/jpg"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              // Validar tamaño (2MB)
+                              if (file.size > 2 * 1024 * 1024) {
+                                toast.error("El archivo es demasiado grande. Máximo 2MB.")
+                                return
+                              }
+                              // Validar tipo
+                              if (!file.type.startsWith('image/')) {
+                                toast.error("Por favor, sube una imagen válida.")
+                                return
+                              }
+                              // Convertir a base64
+                              const reader = new FileReader()
+                              reader.onloadend = () => {
+                                const base64String = reader.result as string
+                                setBusinessSettings(prev => ({ ...prev, logoUrl: base64String }))
+                                toast.success("Logo subido exitosamente")
+                              }
+                              reader.onerror = () => {
+                                toast.error("Error al leer el archivo.")
+                              }
+                              reader.readAsDataURL(file)
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    El logo aparecerá en tus cotizaciones y facturas PDF
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">{t.settings.businessAddress}</label>
                   <Input
                     value={businessSettings.businessAddress}
                     onChange={(e) => setBusinessSettings(prev => ({ ...prev, businessAddress: e.target.value }))}
@@ -367,7 +900,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Tax ID / EIN</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.taxId}</label>
                   <Input
                     value={businessSettings.taxId}
                     onChange={(e) => setBusinessSettings(prev => ({ ...prev, taxId: e.target.value }))}
@@ -376,7 +909,7 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Default Currency</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.defaultCurrency}</label>
                   <select
                     value={businessSettings.defaultCurrency}
                     onChange={(e) => setBusinessSettings(prev => ({ ...prev, defaultCurrency: e.target.value }))}
@@ -390,11 +923,14 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Default Tax Rate (%)</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.defaultTaxRate}</label>
                   <Input
                     type="number"
                     value={businessSettings.defaultTaxRate}
-                    onChange={(e) => setBusinessSettings(prev => ({ ...prev, defaultTaxRate: parseFloat(e.target.value) || 0 }))}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                      setBusinessSettings(prev => ({ ...prev, defaultTaxRate: isNaN(value) ? 0 : value }))
+                    }}
                     min="0"
                     max="100"
                     step="0.01"
@@ -403,132 +939,362 @@ export default function SettingsPage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Default Payment Terms</label>
+                  <label className="block text-sm font-medium mb-2">{t.settings.defaultPaymentTerms}</label>
                   <select
                     value={businessSettings.defaultPaymentTerms}
                     onChange={(e) => setBusinessSettings(prev => ({ ...prev, defaultPaymentTerms: e.target.value }))}
                     className="w-full h-10 rounded-md border border-slate-200 bg-white px-3 text-sm mt-1"
                   >
-                    <option value="Net 15 days">Net 15 days</option>
-                    <option value="Net 30 days">Net 30 days</option>
-                    <option value="Net 45 days">Net 45 days</option>
-                    <option value="Net 60 days">Net 60 days</option>
-                    <option value="Due on receipt">Due on receipt</option>
+                    <option value="Net 15 days">Net 15 días</option>
+                    <option value="Net 30 days">Net 30 días</option>
+                    <option value="Net 45 days">Net 45 días</option>
+                    <option value="Net 60 days">Net 60 días</option>
+                    <option value="Due on receipt">Vencimiento al recibir</option>
                   </select>
                 </div>
               </div>
               
-              <Button onClick={handleBusinessUpdate} className="mt-6 w-full bg-teal-600 hover:bg-teal-700">
-                Save Business Settings
+              <Button 
+                onClick={handleBusinessUpdate} 
+                className="mt-6 w-full bg-teal-600 hover:bg-teal-700"
+                disabled={loadingBusiness || loadingData}
+              >
+                {loadingBusiness ? "Guardando..." : t.settings.saveBusinessSettings}
               </Button>
             </Card>
 
-            {/* Integrations */}
+            {gmailIntegration.connected && (
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">
+                      Cotizaciones detectadas
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      Revisa y crea cotizaciones encontradas en tus correos
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button variant="outline" size="sm" onClick={loadPendingQuotes}>
+                      Refrescar
+                    </Button>
+                    <Badge variant="secondary">
+                      {pendingQuotes.length} pendientes
+                    </Badge>
+                  </div>
+                </div>
+                {loadingPending ? (
+                  <div className="text-sm text-slate-500">Cargando...</div>
+                ) : pendingQuotes.length === 0 ? (
+                  <p className="text-sm text-slate-500">
+                    No hay cotizaciones pendientes. Te avisaremos cuando detectemos nuevas.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingQuotes.map((quote) => (
+                      <div
+                        key={quote.id}
+                        className="border border-slate-200 rounded-lg p-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+                      >
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900">
+                            {quote.title || quote.emailSubject}
+                          </h4>
+                          <p className="text-sm text-slate-600">
+                            {quote.clientName || quote.emailFrom}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Recibido:{" "}
+                            {new Date(quote.emailDate).toLocaleString("es-ES")}
+                          </p>
+                        </div>
+                        <div className="text-right min-w-[140px]">
+                          <p className="font-semibold text-slate-900">
+                            {formatMoney(quote.amount, quote.currency || "EUR")}
+                          </p>
+                          <p className="text-xs text-slate-500 capitalize">
+                            {quote.status}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-2 md:mt-0">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleApprovePending(quote.id)}
+                          >
+                            Crear
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDiscardPending(quote.id)}
+                          >
+                            Descartar
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <Zap className="h-5 w-5 text-purple-600" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Integrations</h2>
-                  <p className="text-slate-600 text-sm">Connect your favorite tools and services</p>
+                  <h2 className="text-xl font-semibold text-slate-900">{t.settings.integrationsTitle}</h2>
+                  <p className="text-slate-600 text-sm">{t.settings.integrationsSubtitle}</p>
                 </div>
               </div>
               
               <div className="space-y-4">
                 {/* Gmail Integration */}
-                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                <div className={`flex items-center justify-between p-4 border rounded-lg transition-colors ${
+                  gmailIntegration.connected 
+                    ? 'border-green-200 bg-green-50/50' 
+                    : 'border-slate-200'
+                }`}>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                      <span className="text-white font-bold text-sm">M</span>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      gmailIntegration.connected ? 'bg-green-500' : 'bg-red-500'
+                    }`}>
+                      {gmailIntegration.connected ? (
+                        <CheckCircle2 className="h-5 w-5 text-white" />
+                      ) : (
+                        <Mail className="h-5 w-5 text-white" />
+                      )}
                     </div>
                     <div>
-                      <h4 className="font-medium">Gmail</h4>
-                      <p className="text-sm text-slate-600">Send quotes directly from Gmail</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">Gmail</h4>
+                        {gmailIntegration.connected && (
+                          <Badge className="bg-green-600 text-white">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Activo
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        {gmailIntegration.connected 
+                          ? `Conectado: ${gmailIntegration.email || 'Gmail'}`
+                          : "Crea cotizaciones automáticamente desde tus correos"}
+                      </p>
+                      {gmailIntegration.connected && gmailIntegration.lastSyncAt && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          Última sincronización: {new Date(gmailIntegration.lastSyncAt).toLocaleString('es-ES')}
+                        </p>
+                      )}
+                      {gmailIntegration.connected && gmailIntegration.pendingQuotes !== undefined && gmailIntegration.pendingQuotes > 0 && (
+                        <p className="text-xs text-blue-600 mt-1 font-medium flex items-center gap-1">
+                          <Bell className="h-3 w-3" />
+                          {gmailIntegration.pendingQuotes} cotización(es) pendiente(s) de revisar
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant={integrations.gmail ? "default" : "secondary"}>
-                      {integrations.gmail ? "Connected" : "Not Connected"}
+                    <Badge variant={gmailIntegration.connected ? "default" : "secondary"} className={
+                      gmailIntegration.connected ? "bg-green-600 text-white" : ""
+                    }>
+                      {gmailIntegration.connected ? (
+                        <span className="flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          {t.settings.connected}
+                        </span>
+                      ) : (
+                        t.settings.notConnected
+                      )}
                     </Badge>
-                    <Button
-                      variant={integrations.gmail ? "outline" : "default"}
-                      size="sm"
-                      onClick={() => handleIntegrationToggle("gmail")}
-                    >
-                      {integrations.gmail ? "Disconnect" : "Connect"}
-                      <ExternalLink className="h-4 w-4 ml-2" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {gmailIntegration.connected && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            // Recargar estado manualmente
+                            try {
+                              const response = await fetch("/api/gmail/status", {
+                                credentials: "include"
+                              })
+                              if (response.ok) {
+                                const data = await response.json()
+                                setGmailIntegration(data)
+                                setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+                                if (data.connected) {
+                                  await loadPendingQuotes()
+                                  toast.success("Estado de Gmail actualizado")
+                                } else {
+                                  toast.warning("Gmail no está conectado")
+                                }
+                              }
+                            } catch (error) {
+                              console.error("Error reloading Gmail status:", error)
+                              toast.error("Error al recargar el estado")
+                            }
+                          }}
+                          title="Recargar estado de Gmail"
+                        >
+                          🔄
+                        </Button>
+                      )}
+                      {gmailIntegration.connected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (confirm("¿Estás seguro de que quieres desconectar Gmail?")) {
+                              const response = await fetch("/api/gmail/oauth/disconnect", {
+                                method: "POST",
+                                credentials: "include"
+                              })
+                              if (response.ok) {
+                                setGmailIntegration({ connected: false })
+                                setIntegrations(prev => ({ ...prev, gmail: false }))
+                                toast.success("Gmail desconectado exitosamente")
+                              } else {
+                                toast.error("Error al desconectar Gmail")
+                              }
+                            }
+                          }}
+                        >
+                          Desconectar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            console.log("Click en Conectar, abriendo wizard...")
+                            setGmailWizardOpen(true)
+                            console.log("gmailWizardOpen debería ser true ahora")
+                          }}
+                        >
+                          Conectar
+                          <ExternalLink className="h-4 w-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
-                {/* Gemini AI Integration */}
                 <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
                       <span className="text-white font-bold text-sm">AI</span>
                     </div>
                     <div>
-                      <h4 className="font-medium">Gemini AI</h4>
-                      <p className="text-sm text-slate-600">Smart quote generation and suggestions</p>
+                      <h4 className="font-medium">{t.settings.geminiAI}</h4>
+                      <p className="text-sm text-slate-600">{t.settings.geminiAIDesc}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge variant={integrations.geminiAI ? "default" : "secondary"}>
-                      {integrations.geminiAI ? "Connected" : "Not Connected"}
+                      {integrations.geminiAI ? t.settings.connected : t.settings.notConnected}
                     </Badge>
                     <Button
                       variant={integrations.geminiAI ? "outline" : "default"}
                       size="sm"
                       onClick={() => handleIntegrationToggle("geminiAI")}
                     >
-                      {integrations.geminiAI ? "Disconnect" : "Connect"}
+                      {integrations.geminiAI ? t.settings.disconnect : t.settings.connect}
                       <ExternalLink className="h-4 w-4 ml-2" />
                     </Button>
                   </div>
                 </div>
                 
-                {/* Coming Soon Section */}
+                {/* Stripe Integration */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">$</span>
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Stripe</h4>
+                      <p className="text-sm text-slate-600">Acepta pagos y cobra facturas automáticamente</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={stripeSettings.enabled ? "default" : "secondary"}>
+                      {stripeSettings.enabled ? t.settings.connected : t.settings.notConnected}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                    >
+                      En Desarrollo
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Telegram Integration */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                      <MessageCircle className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-medium">Telegram</h4>
+                      <p className="text-sm text-slate-600">Crea facturas y cotizaciones desde Telegram</p>
+                      {telegramSettings.linked && telegramSettings.username && (
+                        <p className="text-xs text-slate-500 mt-1">@{telegramSettings.username}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={telegramSettings.linked ? "default" : "secondary"}>
+                      {telegramSettings.linked ? "Vinculado" : "No vinculado"}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled
+                    >
+                      En Desarrollo
+                    </Button>
+                  </div>
+                </div>
+                
                 <div className="mt-6">
-                  <h4 className="font-medium mb-3 text-slate-600">Coming Soon</h4>
+                  <h4 className="font-medium mb-3 text-slate-600">{t.settings.comingSoon}</h4>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-3 bg-slate-100 rounded-lg text-center">
                       <div className="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mx-auto mb-2">
                         <span className="text-white font-bold text-xs">S</span>
                       </div>
-                      <span className="text-sm text-slate-600">Slack</span>
+                      <span className="text-sm text-slate-600">{t.settings.slack}</span>
                     </div>
                     <div className="p-3 bg-slate-100 rounded-lg text-center">
                       <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mx-auto mb-2">
                         <span className="text-white font-bold text-xs">$</span>
                       </div>
-                      <span className="text-sm text-slate-600">QuickBooks</span>
+                      <span className="text-sm text-slate-600">{t.settings.quickbooks}</span>
                     </div>
                   </div>
                 </div>
               </div>
             </Card>
 
-            {/* Data Export / Danger Zone */}
             <Card className="p-6">
               <div className="space-y-6">
-                {/* Data Export */}
                 <div>
-                  <h4 className="font-medium mb-2">Data Export</h4>
-                  <p className="text-sm text-slate-600 mb-3">Download a copy of your data</p>
+                  <h4 className="font-medium mb-2">{t.settings.dataExport}</h4>
+                  <p className="text-sm text-slate-600 mb-3">{t.settings.dataExportDesc}</p>
                   <Button variant="outline" size="sm">
                     <FileText className="h-4 w-4 mr-2" />
-                    Export Data
+                    {t.settings.exportDataButton}
                   </Button>
                 </div>
                 
-                {/* Danger Zone */}
                 <div className="pt-6 border-t border-slate-200">
-                  <h4 className="font-medium mb-2 text-red-600">Danger Zone</h4>
-                  <p className="text-sm text-slate-600 mb-3">Permanently delete your account and all data</p>
+                  <h4 className="font-medium mb-2 text-red-600">{t.settings.dangerZone}</h4>
+                  <p className="text-sm text-slate-600 mb-3">{t.settings.dangerZoneDesc}</p>
                   <Button variant="destructive" size="sm">
                     <AlertTriangle className="h-4 w-4 mr-2" />
-                    Delete Account
+                    {t.settings.deleteAccount}
                   </Button>
                 </div>
               </div>
@@ -536,12 +1302,179 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Profile Onboarding Modal */}
-        {/* <ProfileOnboardingModal
-          isOpen={isOnboardingOpen}
-          onClose={() => setIsOnboardingOpen(false)}
-          onComplete={handleOnboardingComplete}
-        /> */}
+        {/* Telegram Link Dialog */}
+        <Dialog open={telegramDialogOpen} onOpenChange={setTelegramDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  <MessageCircle className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <DialogTitle>Vincular cuenta de Telegram</DialogTitle>
+                  <DialogDescription>
+                    Conecta tu cuenta de Telegram para usar el bot
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label htmlFor="telegram-id" className="text-sm font-medium">
+                  Tu Telegram ID
+                </label>
+                <Input
+                  id="telegram-id"
+                  type="text"
+                  placeholder="123456789"
+                  value={telegramIdInput}
+                  onChange={(e) => setTelegramIdInput(e.target.value)}
+                />
+                <p className="text-xs text-slate-500">
+                  Para obtener tu ID, busca @userinfobot en Telegram y envía /start
+                </p>
+              </div>
+              
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">¿Cómo obtener tu Telegram ID?</h4>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Abre Telegram y busca <code className="bg-blue-100 px-1 rounded">@userinfobot</code></li>
+                  <li>Envía el comando <code className="bg-blue-100 px-1 rounded">/start</code></li>
+                  <li>El bot te mostrará tu ID (número)</li>
+                  <li>Copia ese número y pégalo aquí</li>
+                </ol>
+                <a 
+                  href="https://t.me/userinfobot" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-2 inline-flex items-center gap-1"
+                >
+                  Abrir @userinfobot en Telegram
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTelegramDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleTelegramLink}
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={!telegramIdInput.trim()}
+              >
+                Vincular cuenta
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Stripe Configuration Dialog */}
+        <Dialog open={stripeDialogOpen} onOpenChange={setStripeDialogOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+                  <CreditCard className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <DialogTitle>Configurar Stripe</DialogTitle>
+                  <DialogDescription>
+                    Conecta tu cuenta de Stripe para aceptar pagos automáticamente
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label htmlFor="stripe-secret-key" className="text-sm font-medium">
+                  Secret Key
+                </label>
+                <Input
+                  id="stripe-secret-key"
+                  type="password"
+                  placeholder="sk_test_..."
+                  value={stripeSettings.secretKey}
+                  onChange={(e) => setStripeSettings(prev => ({ ...prev, secretKey: e.target.value }))}
+                />
+                <p className="text-xs text-slate-500">
+                  Encuentra tu Secret Key en tu Dashboard de Stripe
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label htmlFor="stripe-publishable-key" className="text-sm font-medium">
+                  Publishable Key
+                </label>
+                <Input
+                  id="stripe-publishable-key"
+                  type="text"
+                  placeholder="pk_test_..."
+                  value={stripeSettings.publishableKey}
+                  onChange={(e) => setStripeSettings(prev => ({ ...prev, publishableKey: e.target.value }))}
+                />
+                <p className="text-xs text-slate-500">
+                  Tu Publishable Key es pública y segura para usar en el frontend
+                </p>
+              </div>
+              
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <h4 className="text-sm font-semibold text-blue-900 mb-2">¿Cómo obtener tus API Keys?</h4>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                  <li>Ve a tu Dashboard de Stripe</li>
+                  <li>Click en &quot;Developers&quot; → &quot;API keys&quot;</li>
+                  <li>Copia tus keys (usa Test keys para pruebas)</li>
+                  <li>Pégalas aquí y guarda</li>
+                </ol>
+                <a 
+                  href="https://dashboard.stripe.com/apikeys" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 underline mt-2 inline-flex items-center gap-1"
+                >
+                  Ir a Stripe Dashboard
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStripeDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleStripeSave}
+                className="bg-indigo-600 hover:bg-indigo-700"
+                disabled={!stripeSettings.secretKey || !stripeSettings.publishableKey}
+              >
+                Guardar y Conectar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Gmail Integration Wizard */}
+        <GmailIntegrationWizard
+          open={gmailWizardOpen}
+          onClose={() => {
+            setGmailWizardOpen(false)
+            // Recargar estado de Gmail después de cerrar
+            fetch("/api/gmail/status", { credentials: "include" })
+              .then(res => res.json())
+              .then(data => {
+                setGmailIntegration(data)
+                setIntegrations(prev => ({ ...prev, gmail: data.connected }))
+              })
+          }}
+          onComplete={() => {
+            setGmailWizardOpen(false)
+            setGmailIntegration({ connected: true })
+            setIntegrations(prev => ({ ...prev, gmail: true }))
+          }}
+        />
       </div>
   )
 }

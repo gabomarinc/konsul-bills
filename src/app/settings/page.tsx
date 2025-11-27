@@ -17,7 +17,6 @@ import {
   AlertTriangle,
   ExternalLink
 } from "lucide-react"
-import AuthenticatedLayout from "@/components/konsul/AuthenticatedLayout"
 // import ProfileOnboardingModal from "@/components/konsul/ProfileOnboardingModal"
 
 // Tipo para los datos del onboarding
@@ -99,8 +98,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <AuthenticatedLayout>
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -545,6 +543,5 @@ export default function SettingsPage() {
           onComplete={handleOnboardingComplete}
         /> */}
       </div>
-    </AuthenticatedLayout>
   )
 }

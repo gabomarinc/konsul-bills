@@ -181,21 +181,33 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   
   // Cargar mensajes desde localStorage al iniciar
   const loadMessagesFromStorage = (): Message[] => {
-    if (typeof window === 'undefined') return []
+    if (typeof window === 'undefined') {
+      // Mensaje de bienvenida por defecto para SSR
+      return [{
+        id: "welcome",
+        role: "assistant" as const,
+        content: "¡Hola! 👋 Soy Axel, tu asistente de Konsul Bills. Puedo ayudarte a gestionar clientes, cotizaciones y facturas. ¿En qué puedo ayudarte?",
+        timestamp: new Date()
+      }]
+    }
     try {
       const stored = localStorage.getItem('konsul-chat-history')
       if (stored) {
         const parsed = JSON.parse(stored)
-        // Convertir timestamps de string a Date
-        return parsed.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp)
-        }))
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Convertir timestamps de string a Date
+          const messages = parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+          // Si hay mensajes guardados, devolverlos
+          return messages
+        }
       }
     } catch (error) {
       console.error('[ChatBot] Error cargando historial:', error)
     }
-    // Mensaje de bienvenida por defecto
+    // Mensaje de bienvenida por defecto si no hay historial
     return [{
       id: "welcome",
       role: "assistant" as const,
@@ -209,9 +221,13 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
   const [loading, setLoading] = useState(false)
   const [isMinimized, setIsMinimized] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [showQuickActions, setShowQuickActions] = useState(messages.length === 1)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Determinar si mostrar los botones de acción rápida
+  // Se muestran si no hay mensajes del usuario (solo el mensaje de bienvenida)
+  const hasUserMessages = messages.some(msg => msg.role === "user")
+  const showQuickActions = !hasUserMessages && messages.length > 0
 
   // Guardar mensajes en localStorage cada vez que cambien
   useEffect(() => {
@@ -264,7 +280,6 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
 
     setMessages(prev => [...prev, userMessage])
     setInput("")
-    setShowQuickActions(false)
     setLoading(true)
 
     try {
@@ -353,7 +368,6 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
         content: "¡Hola! 👋 Soy Axel, tu asistente de Konsul Bills. Puedo ayudarte a gestionar clientes, cotizaciones y facturas. ¿En qué puedo ayudarte?",
         timestamp: new Date()
       }])
-      setShowQuickActions(true)
       toast.success("Historial limpiado")
     }
   }
@@ -496,8 +510,8 @@ export default function ChatBot({ className = "" }: ChatBotProps) {
             </div>
           ))}
           
-          {/* Quick Actions - Mostrar solo si no hay mensajes del usuario aún o después del mensaje de bienvenida */}
-          {showQuickActions && messages.length === 1 && (
+          {/* Quick Actions - Mostrar solo si no hay mensajes del usuario aún */}
+          {showQuickActions && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-slate-500 px-1">Acciones rápidas:</p>
               <div className="grid grid-cols-2 gap-2">

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
+import DownloadPDFFromHTML from "@/components/konsul/DownloadPDFFromHTML"
 
 export const dynamic = "force-dynamic"
 
@@ -55,7 +56,7 @@ export default async function QuoteViewPage({ params }: { params: Promise<{ id: 
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+      <div id="pdf-content" className="max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-8 py-6">
           <div className="flex justify-between items-start">
@@ -196,6 +197,7 @@ export default async function QuoteViewPage({ params }: { params: Promise<{ id: 
           <p className="text-sm text-gray-500 mt-1">Gracias por confiar en nosotros</p>
         </div>
       </div>
+      <DownloadPDFFromHTML documentId={quote.id} type="quote" />
     </div>
   )
 }

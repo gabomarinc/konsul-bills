@@ -31,9 +31,9 @@ export default function DownloadPDFFromHTML({
         throw new Error("No se encontró el contenido para exportar")
       }
 
-      // Configurar opciones de html2canvas para mejor calidad
+      // Configurar opciones de html2canvas con escala más baja para tamaño adecuado
       const canvas = await html2canvas(element, {
-        scale: 2, // Mayor resolución
+        scale: 1.5, // Balance entre calidad y tamaño
         useCORS: true,
         logging: false,
         backgroundColor: "#f9fafb",
@@ -41,42 +41,59 @@ export default function DownloadPDFFromHTML({
         windowHeight: element.scrollHeight,
       })
 
-      // Calcular dimensiones del PDF (A4)
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
+      // Dimensiones del PDF A4 en mm
       const pdfWidth = 210 // A4 width in mm
       const pdfHeight = 297 // A4 height in mm
       
-      // Calcular escala para que quepa en A4 manteniendo proporción
-      const widthRatio = pdfWidth / imgWidth
-      const heightRatio = pdfHeight / imgHeight
+      // Obtener dimensiones reales del elemento (sin el scale del canvas)
+      const elementWidthPx = element.offsetWidth
+      const elementHeightPx = element.scrollHeight
+      
+      // Convertir píxeles a mm para jsPDF (jsPDF usa 72 DPI = 0.352778 mm/px)
+      // Pero html2canvas a scale 1.5 genera más píxeles, así que ajustamos
+      const scale = 1.5
+      const pxToMm = 0.352778 / scale // Ajustar por el scale usado
+      
+      // Dimensiones del contenido en mm
+      const contentWidthMm = elementWidthPx * pxToMm
+      const contentHeightMm = elementHeightPx * pxToMm
+      
+      // Calcular escala para que quepa en A4 con márgenes
+      const margin = 15 // mm de margen en cada lado
+      const availableWidth = pdfWidth - (margin * 2)
+      const availableHeight = pdfHeight - (margin * 2)
+      
+      const widthRatio = availableWidth / contentWidthMm
+      const heightRatio = availableHeight / contentHeightMm
       const ratio = Math.min(widthRatio, heightRatio)
       
-      const scaledWidth = imgWidth * ratio
-      const scaledHeight = imgHeight * ratio
+      const scaledWidth = contentWidthMm * ratio
+      const scaledHeight = contentHeightMm * ratio
       
       // Crear PDF en formato A4
       const pdf = new jsPDF({
-        orientation: scaledHeight > pdfWidth ? "portrait" : "landscape",
+        orientation: "portrait",
         unit: "mm",
         format: "a4"
       })
 
       // Agregar imagen al PDF
       const imgData = canvas.toDataURL("image/png", 1.0)
-      pdf.addImage(imgData, "PNG", 0, 0, scaledWidth, scaledHeight)
+      const xOffset = (pdfWidth - scaledWidth) / 2
+      pdf.addImage(imgData, "PNG", xOffset, margin, scaledWidth, scaledHeight)
       
       // Si el contenido es más alto que una página, agregar páginas adicionales
-      if (scaledHeight > pdfHeight) {
-        let heightLeft = scaledHeight - pdfHeight
-        let position = -pdfHeight
+      let currentY = margin
+      let remainingHeight = scaledHeight
+      
+      while (remainingHeight > availableHeight) {
+        // Agregar nueva página
+        pdf.addPage()
+        currentY = margin - (scaledHeight - remainingHeight)
+        remainingHeight -= availableHeight
         
-        while (heightLeft > 0) {
-          position = position - pdfHeight
-          pdf.addPage()
-          pdf.addImage(imgData, "PNG", 0, position, scaledWidth, scaledHeight)
-          heightLeft -= pdfHeight
-        }
+        // Agregar la parte restante de la imagen
+        pdf.addImage(imgData, "PNG", xOffset, currentY, scaledWidth, scaledHeight)
       }
 
       // Descargar PDF

@@ -1,8 +1,8 @@
 "use client"
 
-import { Download } from "lucide-react"
+import { Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface DownloadPDFButtonProps {
   type: "quote" | "invoice"
@@ -11,38 +11,17 @@ interface DownloadPDFButtonProps {
 }
 
 export default function DownloadPDFButton({ type, id, variant = "default" }: DownloadPDFButtonProps) {
-  const handleDownload = async () => {
-    try {
-      const endpoint = type === "quote" ? `/api/quotes/${id}/pdf` : `/api/invoices/${id}/pdf`
-      const response = await fetch(endpoint, {
-        credentials: "include"
-      })
+  const router = useRouter()
 
-      if (!response.ok) {
-        throw new Error("Error al generar el PDF")
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `${type === "quote" ? "cotizacion" : "factura"}-${id}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-      
-      toast.success(`PDF de ${type === "quote" ? "cotización" : "factura"} descargado`)
-    } catch (error) {
-      console.error("Error downloading PDF:", error)
-      toast.error("Error al descargar el PDF")
-    }
+  const handleView = () => {
+    const path = type === "quote" ? `/quotes/${id}/view` : `/invoices/${id}/view`
+    router.push(path)
   }
 
   return (
-    <Button onClick={handleDownload} variant={variant} className="flex items-center gap-2" data-pdf-download>
-      <Download className="h-4 w-4" />
-      Descargar PDF
+    <Button onClick={handleView} variant={variant} className="flex items-center gap-2">
+      <Eye className="h-4 w-4" />
+      Ver {type === "quote" ? "Cotización" : "Factura"}
     </Button>
   )
 }

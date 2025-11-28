@@ -200,6 +200,8 @@ export async function GET(
       }).format(item.qty * item.price)
     ])
 
+    const tableStartY = yPos
+    
     autoTable(doc, {
       startY: yPos,
       head: [["DESCRIPCIÓN", "CANT.", "PRECIO UNIT.", "TOTAL"]],
@@ -227,6 +229,15 @@ export async function GET(
         lineWidth: 0.5
       }
     })
+    
+    // Dibujar borde redondeado alrededor de la tabla
+    const tableEndY = (doc as any).lastAutoTable.finalY
+    const tableHeight = tableEndY - tableStartY
+    const tableWidth = pageWidth - (margin * 2)
+    
+    doc.setDrawColor(...primaryColor)
+    doc.setLineWidth(1)
+    doc.roundedRect(margin, tableStartY - 3, tableWidth, tableHeight + 3, 8, 8, 'D')
 
     // ========== TOTALES ==========
     const finalY = (doc as any).lastAutoTable.finalY + 15
@@ -247,21 +258,28 @@ export async function GET(
       { align: "right" }
     )
     
-    // Total en caja verde clara
+    // Total en caja verde clara - calcular ancho necesario
     const totalY = finalY + 8
+    const totalText = new Intl.NumberFormat("es-ES", {
+      style: "currency",
+      currency: quote.currency as "EUR" | "USD"
+    }).format(quote.total) + ` ${quote.currency}`
+    
+    // Calcular ancho del texto para asegurar que el fondo cubra todo
+    const textWidth = doc.getTextWidth(totalText)
+    const labelWidth = doc.getTextWidth("TOTAL:")
+    const totalBoxWidth = Math.max(textWidth + labelWidth + 20, 90) // mínimo 90, o más si el texto es largo
+    
     doc.setFillColor(...lightGreen)
-    doc.roundedRect(totalsX - 80, totalY - 5, 75, 12, 4, 4, 'F')
+    doc.roundedRect(totalsX - totalBoxWidth, totalY - 5, totalBoxWidth, 12, 6, 6, 'F')
     
     doc.setFont("helvetica", "bold")
     doc.setFontSize(12)
     doc.setTextColor(...successColor)
-    doc.text("TOTAL:", totalsX - 60, totalY + 2, { align: "right" })
+    doc.text("TOTAL:", totalsX - totalBoxWidth + 10, totalY + 2, { align: "left" })
     doc.text(
-      new Intl.NumberFormat("es-ES", {
-        style: "currency",
-        currency: quote.currency as "EUR" | "USD"
-      }).format(quote.total) + ` ${quote.currency}`,
-      totalsX,
+      totalText,
+      totalsX - 5,
       totalY + 2,
       { align: "right" }
     )

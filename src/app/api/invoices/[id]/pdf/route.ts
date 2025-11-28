@@ -157,7 +157,17 @@ export async function GET(
     const clientInfo: string[] = []
     if (invoice.Client.email) clientInfo.push(invoice.Client.email)
     if (invoice.Client.phone) clientInfo.push(`Tel: ${invoice.Client.phone}`)
-    if (invoice.Client.address) clientInfo.push(invoice.Client.address)
+    
+    // Construir dirección del cliente
+    const clientAddress = [
+      invoice.Client.billingLine1,
+      invoice.Client.billingLine2,
+      invoice.Client.billingCity,
+      invoice.Client.billingState,
+      invoice.Client.billingZip,
+      invoice.Client.billingCountry
+    ].filter(Boolean).join(", ")
+    if (clientAddress) clientInfo.push(clientAddress)
     
     clientInfo.forEach((info, index) => {
       doc.text(info, rightColumnX, clientY + (index * 5))
